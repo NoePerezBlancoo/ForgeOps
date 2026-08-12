@@ -15,12 +15,14 @@ fi
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
   alembic upgrade head
-else
-  python -m scripts.check_migrations
 fi
 
 if [ "${RUN_RUNTIME_ROLE_SETUP:-false}" = "true" ]; then
   python -m scripts.ensure_runtime_role
+fi
+
+if [ "${RUN_MIGRATIONS:-true}" != "true" ]; then
+  python -m scripts.check_migrations
 fi
 
 if [ "${SEED_DEMO_DATA:-false}" = "true" ]; then

@@ -15,10 +15,11 @@ class Base(DeclarativeBase):
 def _engine_options() -> dict:
     options: dict = {"pool_pre_ping": True}
     if settings.database_url.startswith("postgresql+"):
-        options["connect_args"] = {
-            "connect_timeout": settings.database_connect_timeout_seconds,
-            "options": f"-c statement_timeout={settings.database_statement_timeout_ms}",
-        }
+        options["connect_args"] = {"connect_timeout": settings.database_connect_timeout_seconds}
+        if settings.database_pool_mode != "pgbouncer":
+            options["connect_args"]["options"] = (
+                f"-c statement_timeout={settings.database_statement_timeout_ms}"
+            )
     if settings.database_pool_mode == "pgbouncer":
         options["poolclass"] = NullPool
         if settings.database_url.startswith("postgresql+psycopg"):

@@ -1,5 +1,7 @@
+import os
 import re
 
+from psycopg import sql
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
@@ -9,12 +11,16 @@ ROLE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
 
 
 def main() -> None:
-    role = (settings.database_runtime_role or "").strip()
+    login = os.getenv("DATABASE_RUNTIME_LOGIN", "").strip()
+    password = os.getenv("DATABASE_RUNTIME_PASSWORD", "")
+    role = login or (settings.database_runtime_role or "").strip()
     if not role:
         print("DATABASE_RUNTIME_ROLE no configurado; se usan credenciales restringidas directas")
         return
     if not ROLE_PATTERN.fullmatch(role):
-        raise SystemExit("DATABASE_RUNTIME_ROLE no es valido")
+        raise SystemExit("El rol runtime de PostgreSQL no es valido")
+    if login and len(password) < 24:
+        raise SystemExit("DATABASE_RUNTIME_PASSWORD debe tener al menos 24 caracteres")
     bootstrap_engine = create_engine(
         settings.migration_database_url or settings.database_url,
         poolclass=NullPool,
@@ -27,8 +33,22 @@ def main() -> None:
             text("SELECT 1 FROM pg_roles WHERE rolname = :role"), {"role": role}
         )
         if not exists:
+            create_role = sql.SQL(
+                "CREATE ROLE {} {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS"
+            ).format(
+                sql.Identifier(role),
+                sql.SQL("LOGIN") if login else sql.SQL("NOLOGIN"),
+            )
             connection.exec_driver_sql(
-                f'CREATE ROLE "{role}" NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS'
+                create_role.as_string(connection.connection.driver_connection)
+            )
+        if login:
+            configure_login = sql.SQL(
+                "ALTER ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
+                "NOINHERIT NOBYPASSRLS PASSWORD {}"
+            ).format(sql.Identifier(role), sql.Literal(password))
+            connection.exec_driver_sql(
+                configure_login.as_string(connection.connection.driver_connection)
             )
         connection.exec_driver_sql(f'GRANT "{role}" TO "{owner}"')
         connection.exec_driver_sql(f'GRANT USAGE ON SCHEMA public TO "{role}"')
@@ -47,7 +67,8 @@ def main() -> None:
             f'GRANT USAGE, SELECT ON SEQUENCES TO "{role}"'
         )
     bootstrap_engine.dispose()
-    print(f"Rol de ejecucion preparado: {role}")
+    role_type = "login restringido" if login else "rol restringido"
+    print(f"Rol de ejecucion preparado: {role} ({role_type})")
 
 
 if __name__ == "__main__":
