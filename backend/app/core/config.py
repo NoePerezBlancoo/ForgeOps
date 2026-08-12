@@ -23,6 +23,8 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://forgeops:forgeops-local-only@localhost:5432/forgeops"
     database_pool_mode: Literal["direct", "pgbouncer"] = "direct"
+    database_runtime_role: str | None = "forgeops_runtime"
+    database_user_is_restricted: bool = False
     database_pool_size: int = Field(default=10, ge=1, le=100)
     database_max_overflow: int = Field(default=20, ge=0, le=200)
     database_pool_timeout_seconds: int = Field(default=15, ge=1, le=120)
@@ -142,6 +144,12 @@ class Settings(BaseSettings):
             errors.append("las URLs publicas no pueden apuntar a localhost")
         if not self.database_url.startswith("postgresql+"):
             errors.append("DATABASE_URL debe utilizar PostgreSQL")
+        if self.database_pool_mode == "pgbouncer" and self.database_runtime_role:
+            errors.append(
+                "PgBouncer requiere credenciales de rol restringido y DATABASE_RUNTIME_ROLE vacio"
+            )
+        if not self.database_runtime_role and not self.database_user_is_restricted:
+            errors.append("el usuario de base de datos debe declararse restringido")
         if self.storage_backend != "s3":
             errors.append("STORAGE_BACKEND debe ser s3")
         if not all([self.s3_endpoint, self.s3_access_key, self.s3_secret_key, self.s3_bucket]):

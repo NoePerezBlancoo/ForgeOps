@@ -7,7 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.security import decode_token
-from app.core.database import get_db
+from app.companies.entitlements import module_enabled
+from app.core.database import get_db, set_database_context
 from app.core.enums import CompanyModule, UserRole
 from app.users.models import User
 
@@ -38,6 +39,7 @@ def get_current_user(
     except (ValueError, TypeError):
         raise credentials_error from None
 
+    set_database_context(db, "auth")
     user = db.scalar(
         select(User)
         .options(joinedload(User.company))
@@ -45,6 +47,7 @@ def get_current_user(
     )
     if not user or not user.company.active:
         raise credentials_error
+    set_database_context(db, "tenant", user.company_id)
     if (
         request.method not in {"GET", "HEAD", "OPTIONS"}
         and request.url.path not in WRITE_WHITELIST
@@ -71,7 +74,7 @@ def require_roles(*roles: UserRole) -> Callable:
 
 def require_module(module: CompanyModule) -> Callable:
     def dependency(current_user: User = Depends(get_current_user)) -> User:
-        if module.value not in current_user.company.enabled_modules:
+        if not module_enabled(current_user.company, module):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Este modulo no esta activo para la empresa",

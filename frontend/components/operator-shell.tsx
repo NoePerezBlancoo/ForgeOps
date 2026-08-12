@@ -78,6 +78,9 @@ export function OperatorShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
       <div className="border-t border-white/10 p-3">
+        <p className="mb-2 px-3 text-[9px] font-semibold uppercase text-white/35">
+          v{process.env.NEXT_PUBLIC_APP_VERSION ?? "1.2.1"} / {process.env.NEXT_PUBLIC_ENVIRONMENT ?? "local"} / {(process.env.NEXT_PUBLIC_BUILD_COMMIT ?? "local").slice(0, 8)}
+        </p>
         <button onClick={handleLogout} className="nav-item w-full" title="Cerrar sesion">
           <LogOut size={19} /> Cerrar sesion
         </button>

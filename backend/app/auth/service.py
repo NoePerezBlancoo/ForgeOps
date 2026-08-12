@@ -18,12 +18,14 @@ from app.auth.security import (
     verify_password,
 )
 from app.core.config import settings
+from app.core.database import set_database_context
 from app.email.service import EmailMessage, message_to_payload
 from app.jobs.service import enqueue_job
 from app.users.models import User
 
 
 def authenticate(db: Session, email: str, password: str) -> User:
+    set_database_context(db, "auth")
     user = db.scalar(
         select(User).options(joinedload(User.company)).where(User.email == email.lower().strip())
     )
@@ -37,6 +39,7 @@ def authenticate(db: Session, email: str, password: str) -> User:
 
 
 def issue_session(db: Session, user: User, ip_address: str | None = None) -> tuple[str, str]:
+    set_database_context(db, "tenant", user.company_id)
     access_token = create_access_token(user.id)
     refresh_token, expires_at = create_refresh_token(user.id)
     db.add(
@@ -62,6 +65,7 @@ def issue_session(db: Session, user: User, ip_address: str | None = None) -> tup
 
 
 def rotate_session(db: Session, refresh_token: str) -> tuple[User, str, str]:
+    set_database_context(db, "auth")
     try:
         payload = decode_token(refresh_token, "refresh")
         if payload.get("actor", "user") != "user":
@@ -87,6 +91,7 @@ def rotate_session(db: Session, refresh_token: str) -> tuple[User, str, str]:
     if not user or not user.company.active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Cuenta no disponible")
 
+    set_database_context(db, "tenant", user.company_id)
     session.revoked_at = now
     user.last_login_at = now
     access_token = create_access_token(user.id)
@@ -105,6 +110,7 @@ def rotate_session(db: Session, refresh_token: str) -> tuple[User, str, str]:
 def revoke_session(db: Session, refresh_token: str | None) -> None:
     if not refresh_token:
         return
+    set_database_context(db, "auth")
     session = db.scalar(
         select(RefreshSession).where(RefreshSession.token_hash == token_digest(refresh_token))
     )
@@ -120,9 +126,11 @@ def token_expires_in() -> int:
 def request_password_reset(
     db: Session, email: str, ip_address: str | None = None
 ) -> None:
+    set_database_context(db, "auth")
     user = db.scalar(select(User).where(User.email == email.lower().strip(), User.active.is_(True)))
     if not user:
         return
+    set_database_context(db, "tenant", user.company_id)
     now = datetime.now(UTC)
     raw_token = secrets.token_urlsafe(48)
     reset = PasswordResetToken(
@@ -160,6 +168,7 @@ def request_password_reset(
 
 def confirm_password_reset(db: Session, payload: PasswordResetConfirm) -> None:
     now = datetime.now(UTC)
+    set_database_context(db, "auth")
     reset = db.scalar(
         select(PasswordResetToken)
         .where(PasswordResetToken.token_hash == token_digest(payload.token))
@@ -170,6 +179,7 @@ def confirm_password_reset(db: Session, payload: PasswordResetConfirm) -> None:
     user = db.scalar(select(User).where(User.id == reset.user_id, User.active.is_(True)))
     if not user:
         raise HTTPException(status_code=422, detail="El enlace no es valido o ha caducado")
+    set_database_context(db, "tenant", user.company_id)
     user.password_hash = hash_password(payload.password)
     user.password_changed_at = now
     reset.used_at = now

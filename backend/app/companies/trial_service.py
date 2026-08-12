@@ -12,6 +12,7 @@ from app.auth.schemas import TrialRegistration
 from app.auth.security import hash_password
 from app.companies.models import DEFAULT_COMPANY_MODULES, Company
 from app.core.config import settings
+from app.core.database import set_database_context
 from app.core.enums import (
     AssetStatus,
     CompanyPlan,
@@ -34,6 +35,7 @@ from app.work_orders.models import WorkOrder
 
 
 def register_trial(db: Session, payload: TrialRegistration) -> User:
+    set_database_context(db, "signup")
     if not settings.trial_signup_enabled:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -63,6 +65,7 @@ def register_trial(db: Session, payload: TrialRegistration) -> User:
     )
     db.add(company)
     db.flush()
+    set_database_context(db, "tenant", company.id)
 
     user = User(
         company_id=company.id,

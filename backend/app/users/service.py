@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.audit.service import add_audit_event
 from app.auth.models import RefreshSession
 from app.auth.security import hash_password, verify_password
+from app.companies.entitlements import enforce_limit
 from app.core.enums import UserRole
 from app.users.models import User
 from app.users.schemas import UserCreate, UserPasswordChange, UserPasswordReset, UserUpdate
@@ -41,6 +42,7 @@ def get_user(db: Session, company_id: uuid.UUID, user_id: uuid.UUID) -> User:
 
 def create_user(db: Session, current_user: User, payload: UserCreate) -> User:
     _validate_managed_role(current_user, payload.role)
+    enforce_limit(db, current_user.company, "users")
     user = User(
         id=uuid.uuid4(),
         company_id=current_user.company_id,

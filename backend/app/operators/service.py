@@ -9,6 +9,12 @@ from sqlalchemy.orm import Session, joinedload
 from app.assets.models import Asset
 from app.audit.models import AuditEvent
 from app.auth.models import RefreshSession
+from app.companies.entitlements import (
+    company_usage,
+    effective_limits,
+    effective_modules,
+    normalize_modules,
+)
 from app.companies.models import Company
 from app.core.config import settings
 from app.core.enums import (
@@ -107,6 +113,10 @@ def get_company_detail(db: Session, company_id: uuid.UUID) -> OperatorCompanyDet
         work_order_prefix=company.work_order_prefix,
         updated_at=company.updated_at,
         administrators=[OperatorAdminSummary.model_validate(admin) for admin in admins],
+        limits=effective_limits(company),
+        usage=company_usage(db, company.id),
+        limit_overrides=company.limit_overrides,
+        feature_overrides=company.feature_overrides,
     )
 
 
@@ -130,17 +140,25 @@ def update_company_control(
         "active": company.active,
         "enabled_modules": list(company.enabled_modules),
     }
-    if "enabled_modules" in changes and changes["enabled_modules"] is not None:
-        changes["enabled_modules"] = [module.value for module in changes["enabled_modules"]]
     if changes.get("subscription_status") == SubscriptionStatus.TRIAL:
         changes["plan"] = CompanyPlan.TRIAL
     elif changes.get("subscription_status") == SubscriptionStatus.ACTIVE:
         if changes.get("plan", company.plan) == CompanyPlan.TRIAL:
-            changes["plan"] = CompanyPlan.PROFESSIONAL
+            changes["plan"] = CompanyPlan.PRO
     elif changes.get("plan") == CompanyPlan.TRIAL:
         changes["subscription_status"] = SubscriptionStatus.TRIAL
-    elif changes.get("plan") in {CompanyPlan.DEMO, CompanyPlan.PROFESSIONAL}:
+    elif changes.get("plan") in {
+        CompanyPlan.DEMO,
+        CompanyPlan.STARTER,
+        CompanyPlan.PRO,
+        CompanyPlan.INDUSTRIAL,
+        CompanyPlan.ENTERPRISE,
+        CompanyPlan.PROFESSIONAL,
+    }:
         changes.setdefault("subscription_status", SubscriptionStatus.ACTIVE)
+    target_plan = changes.get("plan", company.plan)
+    requested_modules = changes.get("enabled_modules", company.enabled_modules)
+    changes["enabled_modules"] = normalize_modules(target_plan, requested_modules)
     for field, value in changes.items():
         setattr(company, field, value)
     now = datetime.now(UTC)
@@ -379,7 +397,7 @@ def _company_summary(row) -> OperatorCompanySummary:
         trial_started_at=company.trial_started_at,
         trial_ends_at=company.trial_ends_at,
         trial_days_remaining=company.trial_days_remaining,
-        enabled_modules=company.enabled_modules,
+        enabled_modules=effective_modules(company),
         active=company.active,
         created_at=company.created_at,
         users_count=row.users_count,

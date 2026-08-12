@@ -27,6 +27,10 @@ const tones: Record<string, string> = {
   EXPIRED: "badge-danger",
   INACTIVE: "badge-neutral",
   PROFESSIONAL: "badge-success",
+  STARTER: "badge-info",
+  PRO: "badge-success",
+  INDUSTRIAL: "badge-warning",
+  ENTERPRISE: "badge-neutral",
   DEMO: "badge-warning",
 };
 

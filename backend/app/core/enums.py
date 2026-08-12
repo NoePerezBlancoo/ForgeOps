@@ -12,6 +12,10 @@ class UserRole(StrEnum):
 class CompanyPlan(StrEnum):
     DEMO = "DEMO"
     TRIAL = "TRIAL"
+    STARTER = "STARTER"
+    PRO = "PRO"
+    INDUSTRIAL = "INDUSTRIAL"
+    ENTERPRISE = "ENTERPRISE"
     PROFESSIONAL = "PROFESSIONAL"
 
 

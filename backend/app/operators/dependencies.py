@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.security import decode_token
-from app.core.database import get_db
+from app.core.database import get_db, set_database_context
 from app.operators.models import PlatformOperator
 
 operator_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/v1/operator-auth/login")
@@ -28,6 +28,7 @@ def get_current_operator(
         operator_id = uuid.UUID(payload["sub"])
     except (ValueError, TypeError):
         raise error from None
+    set_database_context(db, "platform")
     operator = db.scalar(
         select(PlatformOperator).where(
             PlatformOperator.id == operator_id,

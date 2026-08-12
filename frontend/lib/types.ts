@@ -5,7 +5,14 @@ export type UserRole =
   | "TECHNICIAN"
   | "VIEWER";
 
-export type CompanyPlan = "DEMO" | "TRIAL" | "PROFESSIONAL";
+export type CompanyPlan =
+  | "DEMO"
+  | "TRIAL"
+  | "STARTER"
+  | "PRO"
+  | "INDUSTRIAL"
+  | "ENTERPRISE"
+  | "PROFESSIONAL";
 export type SubscriptionStatus = "TRIAL" | "ACTIVE" | "SUSPENDED";
 export type AccessStatus = SubscriptionStatus | "EXPIRED";
 export type CompanyModule = "PREVENTIVE" | "INVENTORY" | "DOCUMENTS" | "KNOWLEDGE";
@@ -132,6 +139,10 @@ export interface OperatorCompanyDetail extends OperatorCompanySummary {
     active: boolean;
     last_login_at: string | null;
   }>;
+  limits: Record<string, number | null>;
+  usage: Record<string, number>;
+  limit_overrides: Record<string, number | null>;
+  feature_overrides: Record<string, boolean>;
 }
 
 export interface OperatorCompanyPage {

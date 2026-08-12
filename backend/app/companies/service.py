@@ -4,8 +4,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.audit.service import add_audit_event
+from app.companies.entitlements import (
+    company_usage,
+    effective_limits,
+    effective_modules,
+    feature_enabled,
+    normalize_modules,
+)
 from app.companies.models import Company
-from app.companies.schemas import CompanyModulesUpdate, CompanyUpdate
+from app.companies.schemas import CompanyEntitlementsRead, CompanyModulesUpdate, CompanyUpdate
 from app.users.models import User
 
 
@@ -43,7 +50,14 @@ def update_company_modules(
 ) -> Company:
     company = current_user.company
     previous = set(company.enabled_modules)
-    company.enabled_modules = [module.value for module in payload.enabled_modules]
+    normalized = normalize_modules(company.plan, payload.enabled_modules)
+    requested = {module.value for module in payload.enabled_modules}
+    if set(normalized) != requested:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El plan actual no permite activar todos los modulos solicitados",
+        )
+    company.enabled_modules = normalized
     add_audit_event(
         db,
         company.id,
@@ -60,3 +74,21 @@ def update_company_modules(
     db.commit()
     db.refresh(company)
     return company
+
+
+def get_company_entitlements(db: Session, company: Company) -> CompanyEntitlementsRead:
+    known_features = (
+        "PWA",
+        "AUDIT",
+        "EXPORT",
+        "DOCUMENT_AI",
+        "INDUSTRIAL_INTEGRATIONS",
+        "SSO",
+    )
+    return CompanyEntitlementsRead(
+        plan=company.plan,
+        modules=effective_modules(company),
+        limits=effective_limits(company),
+        usage=company_usage(db, company.id),
+        features={feature: feature_enabled(company, feature) for feature in known_features},
+    )

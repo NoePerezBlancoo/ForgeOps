@@ -19,6 +19,8 @@ else
   python -m scripts.check_migrations
 fi
 
+python -m scripts.ensure_runtime_role
+
 if [ "${SEED_DEMO_DATA:-false}" = "true" ]; then
   python -m scripts.seed_demo
 fi

@@ -71,3 +71,11 @@ class CompanyModulesUpdate(BaseModel):
             selected.add(CompanyModule.DOCUMENTS)
         self.enabled_modules = [module for module in CompanyModule if module in selected]
         return self
+
+
+class CompanyEntitlementsRead(BaseModel):
+    plan: CompanyPlan
+    modules: list[CompanyModule]
+    limits: dict[str, int | None]
+    usage: dict[str, int]
+    features: dict[str, bool]

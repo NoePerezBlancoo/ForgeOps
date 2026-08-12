@@ -42,6 +42,7 @@ services:
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-forgeops}:${POSTGRES_PASSWORD:-forgeops-local-only}@postgres:5432/${POSTGRES_DB:-forgeops}
       DATABASE_POOL_MODE: ${DATABASE_POOL_MODE:-direct}
+      DATABASE_RUNTIME_ROLE: ${DATABASE_RUNTIME_ROLE:-forgeops_runtime}
       REDIS_URL: redis://redis:6379/0
       REDIS_REQUIRED: "true"
       SECRET_KEY: ${SECRET_KEY:-development-key-change-before-deployment-2026}
@@ -92,6 +93,7 @@ services:
       APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-forgeops}:${POSTGRES_PASSWORD:-forgeops-local-only}@postgres:5432/${POSTGRES_DB:-forgeops}
       DATABASE_POOL_MODE: ${DATABASE_POOL_MODE:-direct}
+      DATABASE_RUNTIME_ROLE: ${DATABASE_RUNTIME_ROLE:-forgeops_runtime}
       REDIS_URL: redis://redis:6379/0
       REDIS_REQUIRED: "true"
       SECRET_KEY: ${SECRET_KEY:-development-key-change-before-deployment-2026}
@@ -129,10 +131,18 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
         NEXT_PUBLIC_SALES_EMAIL: ${NEXT_PUBLIC_SALES_EMAIL:-contacto@forgeops.local}
         NEXT_PUBLIC_DEMO_CREDENTIALS: ${NEXT_PUBLIC_DEMO_CREDENTIALS:-true}
+        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.2.1}
+        NEXT_PUBLIC_BUILD_COMMIT: ${BUILD_COMMIT:-local}
+        NEXT_PUBLIC_ENVIRONMENT: ${APP_ENV:-development}
+        NEXT_PUBLIC_PWA_ENABLED: ${NEXT_PUBLIC_PWA_ENABLED:-true}
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
       NEXT_PUBLIC_SALES_EMAIL: ${NEXT_PUBLIC_SALES_EMAIL:-contacto@forgeops.local}
       NEXT_PUBLIC_DEMO_CREDENTIALS: ${NEXT_PUBLIC_DEMO_CREDENTIALS:-true}
+      NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.2.1}
+      NEXT_PUBLIC_BUILD_COMMIT: ${BUILD_COMMIT:-local}
+      NEXT_PUBLIC_ENVIRONMENT: ${APP_ENV:-development}
+      NEXT_PUBLIC_PWA_ENABLED: ${NEXT_PUBLIC_PWA_ENABLED:-true}
     ports:
       - "3000:3000"
     depends_on:

@@ -3,8 +3,17 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user, require_roles
 from app.companies.models import Company
-from app.companies.schemas import CompanyModulesUpdate, CompanyRead, CompanyUpdate
-from app.companies.service import update_company, update_company_modules
+from app.companies.schemas import (
+    CompanyEntitlementsRead,
+    CompanyModulesUpdate,
+    CompanyRead,
+    CompanyUpdate,
+)
+from app.companies.service import (
+    get_company_entitlements,
+    update_company,
+    update_company_modules,
+)
 from app.core.database import get_db
 from app.core.enums import UserRole
 from app.users.models import User
@@ -16,6 +25,14 @@ administrators = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 @router.get("/current", response_model=CompanyRead)
 def current_company(current_user: User = Depends(get_current_user)) -> Company:
     return current_user.company
+
+
+@router.get("/current/entitlements", response_model=CompanyEntitlementsRead)
+def current_entitlements(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> CompanyEntitlementsRead:
+    return get_company_entitlements(db, current_user.company)
 
 
 @router.patch("/current", response_model=CompanyRead)

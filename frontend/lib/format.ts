@@ -46,6 +46,10 @@ const labels: Record<string, string> = {
   EXPIRED: "Caducada",
   DEMO: "Demo",
   PROFESSIONAL: "Profesional",
+  STARTER: "Starter",
+  PRO: "Pro",
+  INDUSTRIAL: "Industrial",
+  ENTERPRISE: "Enterprise",
   INACTIVE: "Inactiva",
 };
 

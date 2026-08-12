@@ -7,8 +7,10 @@ from pydantic import ValidationError
 from sqlalchemy import func, select
 
 from app.auth.models import PasswordResetToken
+from app.companies.models import Company
 from app.core.config import Settings
 from app.core.crypto import decrypt_json
+from app.core.enums import CompanyPlan
 from app.documents.storage import LocalStorageService
 from app.jobs.models import BackgroundJob
 from app.jobs.service import enqueue_job
@@ -102,3 +104,30 @@ def test_password_reset_does_not_disclose_unknown_accounts(client, database):
     )
     assert response.status_code == 202
     assert database.scalar(select(func.count(PasswordResetToken.id))) == 0
+
+
+def test_plan_entitlements_limit_modules_and_resource_creation(client, database):
+    company = database.scalar(select(Company).where(Company.name == "Alpha Factory"))
+    company.plan = CompanyPlan.STARTER
+    company.limit_overrides = {"users": 3}
+    database.commit()
+    headers = login(client, "admin@alpha.local", "Admin123!")
+
+    entitlements = client.get("/api/v1/companies/current/entitlements", headers=headers)
+    assert entitlements.status_code == 200
+    assert entitlements.json()["modules"] == ["PREVENTIVE", "DOCUMENTS"]
+    assert entitlements.json()["limits"]["users"] == 3
+    assert entitlements.json()["usage"]["users"] == 3
+
+    rejected = client.post(
+        "/api/v1/users",
+        headers=headers,
+        json={
+            "full_name": "Over Limit",
+            "email": "limit@alpha.local",
+            "password": "OverLimit123!",
+            "role": "VIEWER",
+        },
+    )
+    assert rejected.status_code == 409
+    assert "limite de users" in rejected.json()["detail"]

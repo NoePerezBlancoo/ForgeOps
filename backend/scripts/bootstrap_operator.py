@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from app.auth.security import hash_password
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, set_database_context
 from app.operators.auth_service import add_operator_audit_event
 from app.operators.models import PlatformOperator
 from app.operators.security import encrypt_mfa_secret, generate_mfa_secret, provisioning_uri
@@ -31,6 +31,7 @@ def main() -> None:
         raise SystemExit(2) from exc
 
     with SessionLocal() as db:
+        set_database_context(db, "system")
         existing = db.scalar(select(PlatformOperator).where(PlatformOperator.email == email))
         if existing:
             print(f"El operador {email} ya existe; no se ha modificado su MFA.")

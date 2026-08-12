@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.assets.models import Asset
 from app.assets.schemas import AssetCreate, AssetUpdate
+from app.companies.entitlements import enforce_limit
+from app.companies.models import Company
 from app.core.enums import AssetStatus, Criticality
 from app.plants.models import Plant
 
@@ -64,6 +66,10 @@ def get_asset(db: Session, company_id: uuid.UUID, asset_id: uuid.UUID) -> Asset:
 
 
 def create_asset(db: Session, company_id: uuid.UUID, payload: AssetCreate) -> Asset:
+    company = db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    enforce_limit(db, company, "assets")
     _plant_for_company(db, company_id, payload.plant_id)
     asset = Asset(company_id=company_id, **payload.model_dump())
     db.add(asset)

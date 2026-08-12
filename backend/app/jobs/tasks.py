@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from app.core.crypto import decrypt_json
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, set_database_context
 from app.core.enums import JobStatus
 from app.email.service import get_email_service, message_from_payload
 from app.jobs.models import BackgroundJob
@@ -15,6 +15,7 @@ logger = logging.getLogger("forgeops.worker")
 
 def execute_job(job_id: str) -> str:
     with SessionLocal() as db:
+        set_database_context(db, "system")
         job = db.scalar(
             select(BackgroundJob)
             .where(BackgroundJob.id == uuid.UUID(job_id))

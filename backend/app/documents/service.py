@@ -5,6 +5,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.assets.models import Asset
+from app.companies.entitlements import enforce_limit
 from app.core.config import settings
 from app.core.enums import DocumentType
 from app.documents.models import TechnicalDocument
@@ -88,6 +89,8 @@ async def create_document(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail="El archivo supera el limite permitido",
         )
+
+    enforce_limit(db, current_user.company, "storage_bytes", len(content))
 
     stored = storage.store(
         current_user.company_id,

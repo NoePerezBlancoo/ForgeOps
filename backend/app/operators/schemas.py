@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.auth.schemas import RefreshRequest
+from app.companies.entitlements import LIMIT_KEYS
 from app.core.enums import CompanyModule, CompanyPlan, SubscriptionStatus
 from app.core.schemas import ORMModel
 from app.users.schemas import UserPasswordChange
@@ -74,6 +75,10 @@ class OperatorCompanyDetail(OperatorCompanySummary):
     work_order_prefix: str
     updated_at: datetime
     administrators: list[OperatorAdminSummary]
+    limits: dict[str, int | None]
+    usage: dict[str, int]
+    limit_overrides: dict[str, int | None]
+    feature_overrides: dict[str, bool]
 
 
 class OperatorDashboardRead(BaseModel):
@@ -96,6 +101,8 @@ class OperatorCompanyUpdate(BaseModel):
     subscription_status: SubscriptionStatus | None = None
     active: bool | None = None
     enabled_modules: list[CompanyModule] | None = None
+    limit_overrides: dict[str, int | None] | None = None
+    feature_overrides: dict[str, bool] | None = None
     reason: str | None = Field(default=None, min_length=5, max_length=500)
 
     @model_validator(mode="after")
@@ -105,6 +112,19 @@ class OperatorCompanyUpdate(BaseModel):
             if CompanyModule.KNOWLEDGE in selected:
                 selected.add(CompanyModule.DOCUMENTS)
             self.enabled_modules = [module for module in CompanyModule if module in selected]
+        if self.limit_overrides is not None:
+            invalid_keys = set(self.limit_overrides) - LIMIT_KEYS
+            invalid_values = [
+                value
+                for value in self.limit_overrides.values()
+                if value is not None and (not isinstance(value, int) or value < 0)
+            ]
+            if invalid_keys or invalid_values:
+                raise ValueError("Los limites personalizados no son validos")
+        if self.feature_overrides is not None:
+            self.feature_overrides = {
+                key.strip().upper(): value for key, value in self.feature_overrides.items()
+            }
         if (
             self.subscription_status == SubscriptionStatus.SUSPENDED or self.active is False
         ) and not self.reason:
