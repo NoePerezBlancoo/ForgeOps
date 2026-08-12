@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.audit.service import add_audit_event
 from app.auth.security import hash_password
 from app.companies.models import Company
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, set_database_context
 from app.core.enums import CompanyPlan, SubscriptionStatus, UserRole
 from app.models import *  # noqa: F403
 from app.plants.models import Plant
@@ -41,6 +41,7 @@ def main() -> None:
         raise SystemExit(2) from exc
 
     with SessionLocal() as db:
+        set_database_context(db, "system")
         company = db.scalar(select(Company).where(Company.tax_id == tax_id))
         if not company:
             company = Company(

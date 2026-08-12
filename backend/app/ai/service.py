@@ -28,7 +28,7 @@ from app.assets.models import Asset
 from app.core.config import settings
 from app.core.enums import DocumentIndexStatus
 from app.documents.models import TechnicalDocument
-from app.documents.storage import LocalDocumentStorage
+from app.documents.storage import StorageService
 from app.users.models import User
 
 STOP_WORDS = {
@@ -111,7 +111,7 @@ def index_document(
     db: Session,
     company_id: uuid.UUID,
     document_id: uuid.UUID,
-    storage: LocalDocumentStorage,
+    storage: StorageService,
     force: bool = False,
     provider: OpenAIKnowledgeProvider | None = None,
 ) -> DocumentIndexRead:
@@ -131,9 +131,11 @@ def index_document(
     document.index_error = None
     db.commit()
     try:
-        path = storage.path_for(document.storage_key)
-        content_hash = hashlib.sha256(path.read_bytes()).hexdigest()
-        sections = extract_sections(path, document.original_name, settings.rag_max_document_chars)
+        content = storage.read(company_id, document.storage_key)
+        content_hash = hashlib.sha256(content).hexdigest()
+        sections = extract_sections(
+            content, document.original_name, settings.rag_max_document_chars
+        )
         chunks = chunk_sections(sections, settings.rag_chunk_chars, settings.rag_chunk_overlap)
         if not chunks:
             raise EmptyDocumentError("No se generaron fragmentos indexables")
@@ -187,7 +189,7 @@ def index_document(
 def index_documents(
     db: Session,
     company_id: uuid.UUID,
-    storage: LocalDocumentStorage,
+    storage: StorageService,
     force: bool = False,
     provider: OpenAIKnowledgeProvider | None = None,
 ) -> BulkIndexRead:

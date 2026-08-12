@@ -12,6 +12,10 @@ class UserRole(StrEnum):
 class CompanyPlan(StrEnum):
     DEMO = "DEMO"
     TRIAL = "TRIAL"
+    STARTER = "STARTER"
+    PRO = "PRO"
+    INDUSTRIAL = "INDUSTRIAL"
+    ENTERPRISE = "ENTERPRISE"
     PROFESSIONAL = "PROFESSIONAL"
 
 
@@ -101,3 +105,11 @@ class DocumentIndexStatus(StrEnum):
     READY = "READY"
     FAILED = "FAILED"
     UNSUPPORTED = "UNSUPPORTED"
+
+
+class JobStatus(StrEnum):
+    PENDING = "PENDING"
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"

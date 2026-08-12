@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.assets.models import Asset
 from app.audit.service import add_audit_event
+from app.companies.entitlements import enforce_limit
 from app.plants.models import Plant
 from app.plants.schemas import PlantCreate, PlantUpdate
 from app.users.models import User
@@ -29,6 +30,7 @@ def get_plant(db: Session, company_id: uuid.UUID, plant_id: uuid.UUID) -> Plant:
 
 
 def create_plant(db: Session, current_user: User, payload: PlantCreate) -> Plant:
+    enforce_limit(db, current_user.company, "plants")
     plant = Plant(id=uuid.uuid4(), company_id=current_user.company_id, **payload.model_dump())
     db.add(plant)
     add_audit_event(

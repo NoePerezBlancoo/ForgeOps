@@ -66,8 +66,23 @@ class SessionsRevokedRead(BaseModel):
     revoked: int
 
 
+class PasswordResetRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=255)
+
+    _normalize_email = field_validator("email")(validate_email)
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=32, max_length=200)
+    password: str = Field(min_length=10, max_length=128)
+
+    _password_policy = field_validator("password")(validate_password)
+
+
 __all__ = [
     "LoginRequest",
+    "PasswordResetConfirm",
+    "PasswordResetRequest",
     "RefreshRequest",
     "SessionRead",
     "SessionsRevokedRead",

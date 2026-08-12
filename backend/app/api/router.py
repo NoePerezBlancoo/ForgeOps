@@ -11,12 +11,16 @@ from app.incidents.routes import router as incidents_router
 from app.inventory.routes import router as inventory_router
 from app.maintenance.routes import router as maintenance_router
 from app.onboarding.routes import router as onboarding_router
+from app.operators.auth_routes import router as operator_auth_router
+from app.operators.routes import router as operator_router
 from app.plants.routes import router as plants_router
 from app.users.routes import router as users_router
 from app.work_orders.routes import router as work_orders_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
+api_router.include_router(operator_auth_router)
+api_router.include_router(operator_router)
 api_router.include_router(users_router)
 api_router.include_router(companies_router)
 api_router.include_router(plants_router)

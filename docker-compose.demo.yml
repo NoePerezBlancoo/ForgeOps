@@ -16,34 +16,77 @@ services:
       retries: 12
     restart: unless-stopped
 
+  redis:
+    image: redis:8.2-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - forgeops_demo_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
-    environment:
-      APP_ENV: production
+    environment: &backend-environment
+      APP_ENV: ${APP_ENV:-staging}
+      APP_VERSION: ${APP_VERSION:-1.2.1}
+      BUILD_COMMIT: ${BUILD_COMMIT:-manual-demo}
       SEED_DEMO_DATA: "false"
+      ALLOW_DEMO_SEED: "false"
+      RUN_MIGRATIONS: "true"
+      RUN_RUNTIME_ROLE_SETUP: "true"
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-forgeops}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-forgeops}
+      DATABASE_POOL_MODE: direct
+      DATABASE_RUNTIME_ROLE: forgeops_runtime
+      REDIS_URL: redis://redis:6379/0
+      REDIS_REQUIRED: "true"
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
-      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
-      REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-7}
+      FRONTEND_URL: https://${DEMO_DOMAIN:?DEMO_DOMAIN is required}
+      API_URL: https://${DEMO_DOMAIN}
+      CONTROL_URL: https://${DEMO_DOMAIN}/control
+      CORS_ORIGINS: https://${DEMO_DOMAIN}
+      COOKIE_SECURE: "true"
+      STORAGE_BACKEND: local
+      UPLOAD_DIRECTORY: /app/uploads
+      EMAIL_BACKEND: development
       TRIAL_DAYS: ${TRIAL_DAYS:-30}
       TRIAL_SIGNUP_ENABLED: ${TRIAL_SIGNUP_ENABLED:-true}
-      FRONTEND_URL: https://${DEMO_DOMAIN:?DEMO_DOMAIN is required}
-      COOKIE_SECURE: "true"
-      UPLOAD_DIRECTORY: /app/uploads
-      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-15728640}
       AI_PROVIDER: ${AI_PROVIDER:-local}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-5}
-      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      SENTRY_DSN: ${SENTRY_DSN:-}
     volumes:
       - forgeops_demo_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
       interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+    entrypoint: ["python", "-m", "app.jobs.worker"]
+    environment: *backend-environment
+    volumes:
+      - forgeops_demo_uploads:/app/uploads
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from app.core.redis import get_queue_redis; assert get_queue_redis().ping()"]
+      interval: 15s
       timeout: 5s
       retries: 12
     restart: unless-stopped
@@ -55,6 +98,10 @@ services:
         NEXT_PUBLIC_API_URL: /api/v1
         NEXT_PUBLIC_SALES_EMAIL: ${NEXT_PUBLIC_SALES_EMAIL:?NEXT_PUBLIC_SALES_EMAIL is required}
         NEXT_PUBLIC_DEMO_CREDENTIALS: "false"
+        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-1.2.1}
+        NEXT_PUBLIC_BUILD_COMMIT: ${BUILD_COMMIT:-manual-demo}
+        NEXT_PUBLIC_ENVIRONMENT: ${APP_ENV:-staging}
+        NEXT_PUBLIC_PWA_ENABLED: "true"
     depends_on:
       backend:
         condition: service_healthy
@@ -86,6 +133,7 @@ services:
 
 volumes:
   forgeops_demo_postgres:
+  forgeops_demo_redis:
   forgeops_demo_uploads:
   caddy_data:
   caddy_config:

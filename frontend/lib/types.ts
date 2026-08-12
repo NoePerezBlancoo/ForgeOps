@@ -5,7 +5,14 @@ export type UserRole =
   | "TECHNICIAN"
   | "VIEWER";
 
-export type CompanyPlan = "DEMO" | "TRIAL" | "PROFESSIONAL";
+export type CompanyPlan =
+  | "DEMO"
+  | "TRIAL"
+  | "STARTER"
+  | "PRO"
+  | "INDUSTRIAL"
+  | "ENTERPRISE"
+  | "PROFESSIONAL";
 export type SubscriptionStatus = "TRIAL" | "ACTIVE" | "SUSPENDED";
 export type AccessStatus = SubscriptionStatus | "EXPIRED";
 export type CompanyModule = "PREVENTIVE" | "INVENTORY" | "DOCUMENTS" | "KNOWLEDGE";
@@ -32,6 +39,16 @@ export type FrequencyType = "DAYS" | "WEEKS" | "MONTHS" | "YEARS";
 export type InventoryMovementType = "RECEIPT" | "CONSUMPTION" | "ADJUSTMENT";
 export type DocumentType = "MANUAL" | "ELECTRICAL_SCHEMATIC" | "PROCEDURE" | "SAFETY" | "OTHER";
 export type DocumentIndexStatus = "PENDING" | "INDEXING" | "READY" | "FAILED" | "UNSUPPORTED";
+
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  sort: string;
+  filters: Record<string, string | boolean>;
+}
 
 export interface CompanySummary {
   id: string;
@@ -82,6 +99,111 @@ export interface UserOption {
   email: string;
   role: UserRole;
   active: boolean;
+}
+
+export interface PlatformOperator {
+  id: string;
+  full_name: string;
+  email: string;
+  active: boolean;
+  mfa_enabled: boolean;
+  last_login_at: string | null;
+  password_changed_at: string | null;
+  created_at: string;
+}
+
+export interface OperatorCompanySummary {
+  id: string;
+  name: string;
+  email: string | null;
+  industry: string | null;
+  plan: CompanyPlan;
+  subscription_status: SubscriptionStatus;
+  access_status: AccessStatus;
+  trial_started_at: string | null;
+  trial_ends_at: string | null;
+  trial_days_remaining: number | null;
+  enabled_modules: CompanyModule[];
+  active: boolean;
+  created_at: string;
+  users_count: number;
+  plants_count: number;
+  assets_count: number;
+  open_incidents_count: number;
+  open_work_orders_count: number;
+  last_activity_at: string | null;
+}
+
+export interface OperatorCompanyDetail extends OperatorCompanySummary {
+  tax_id: string | null;
+  address: string | null;
+  phone: string | null;
+  timezone: string;
+  locale: string;
+  work_order_prefix: string;
+  updated_at: string;
+  administrators: Array<{
+    id: string;
+    full_name: string;
+    email: string;
+    active: boolean;
+    last_login_at: string | null;
+  }>;
+  limits: Record<string, number | null>;
+  usage: Record<string, number>;
+  limit_overrides: Record<string, number | null>;
+  feature_overrides: Record<string, boolean>;
+}
+
+export interface OperatorCompanyPage {
+  items: OperatorCompanySummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface OperatorDashboard {
+  total_companies: number;
+  active_trials: number;
+  expiring_trials: number;
+  expired_trials: number;
+  active_customers: number;
+  suspended_companies: number;
+  active_users: number;
+  total_plants: number;
+  total_assets: number;
+  open_incidents: number;
+  open_work_orders: number;
+  storage_bytes: number;
+  queue_depth: number | null;
+  failed_jobs: number;
+  service_status: Record<string, string>;
+  version: string;
+  environment: string;
+  commit: string;
+  module_adoption: Record<CompanyModule, number>;
+  recent_companies: OperatorCompanySummary[];
+}
+
+export interface OperatorAuditEvent {
+  id: string;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  summary: string;
+  context: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
+  operator: Pick<PlatformOperator, "id" | "full_name" | "email"> | null;
+}
+
+export interface OperatorAuditPage {
+  items: OperatorAuditEvent[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
 }
 
 export interface Plant {

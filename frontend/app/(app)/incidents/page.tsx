@@ -1,17 +1,20 @@
 "use client";
 
 import { Clock3, Plus, Search, Settings2 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorBanner, LoadingBlock } from "@/components/feedback";
 import { Modal } from "@/components/modal";
 import { PageHeader } from "@/components/page-header";
+import { PaginationBar } from "@/components/pagination-bar";
 import { StatusBadge } from "@/components/status-badge";
 import { useWorkspace } from "@/components/workspace-provider";
 import { ApiError } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import type { Asset, Incident, IncidentStatus, Priority, UserOption } from "@/lib/types";
+import type { Asset, Incident, IncidentStatus, Paginated, Priority, UserOption } from "@/lib/types";
+
+const PAGE_SIZE = 25;
 
 interface CreateForm {
   asset_id: string;
@@ -36,13 +39,14 @@ const emptyCreate: CreateForm = { asset_id: "", assigned_to: "", title: "", desc
 export default function IncidentsPage() {
   const { request, user } = useAuth();
   const { scopedPath } = useWorkspace();
-  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [pageData, setPageData] = useState<Paginated<Incident> | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [selected, setSelected] = useState<Incident | null>(null);
@@ -50,29 +54,44 @@ export default function IncidentsPage() {
   const [manageForm, setManageForm] = useState<ManageForm | null>(null);
   const [saving, setSaving] = useState(false);
   const deepLinkHandled = useRef(false);
+  const deferredSearch = useDeferredValue(search);
 
   const canManage = user && user.role !== "VIEWER";
 
-  const loadData = useCallback(async () => {
+  const loadIncidents = useCallback(async () => {
     setLoading(true);
     setError("");
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(PAGE_SIZE),
+      sort: "reported",
+    });
+    if (deferredSearch.trim()) params.set("search", deferredSearch.trim());
+    if (statusFilter) params.set("status", statusFilter);
     try {
-      const [incidentData, assetData, userData] = await Promise.all([
-        request<Incident[]>(scopedPath("/incidents")),
-        request<Asset[]>(scopedPath("/assets")),
-        request<UserOption[]>("/users/options"),
-      ]);
-      setIncidents(incidentData);
-      setAssets(assetData);
-      setUsers(userData.filter((item) => ["TECHNICIAN", "MAINTENANCE_MANAGER", "ADMIN"].includes(item.role)));
+      setPageData(await request<Paginated<Incident>>(scopedPath(`/incidents/page?${params}`)));
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "No se pudieron cargar las incidencias");
     } finally {
       setLoading(false);
     }
+  }, [deferredSearch, page, request, scopedPath, statusFilter]);
+
+  const loadOptions = useCallback(async () => {
+    try {
+      const [assetData, userData] = await Promise.all([
+        request<Asset[]>(scopedPath("/assets")),
+        request<UserOption[]>("/users/options"),
+      ]);
+      setAssets(assetData);
+      setUsers(userData.filter((item) => ["TECHNICIAN", "MAINTENANCE_MANAGER", "ADMIN"].includes(item.role)));
+    } catch (requestError) {
+      setError(requestError instanceof ApiError ? requestError.message : "No se pudieron cargar las opciones de asignacion");
+    }
   }, [request, scopedPath]);
 
-  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => { void loadIncidents(); }, [loadIncidents]);
+  useEffect(() => { void loadOptions(); }, [loadOptions]);
 
   useEffect(() => {
     if (loading || !canManage || deepLinkHandled.current || assets.length === 0) return;
@@ -83,13 +102,7 @@ export default function IncidentsPage() {
     window.history.replaceState({}, "", "/incidents");
   }, [assets, canManage, loading]);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return incidents.filter((incident) => {
-      const matchesSearch = !term || [incident.title, incident.asset.code, incident.asset.name].some((value) => value.toLowerCase().includes(term));
-      return matchesSearch && (!statusFilter || incident.status === statusFilter);
-    });
-  }, [incidents, search, statusFilter]);
+  const incidents = pageData?.items ?? [];
 
   function openCreate() {
     setCreateForm({ ...emptyCreate, asset_id: assets[0]?.id ?? "" });
@@ -126,7 +139,7 @@ export default function IncidentsPage() {
         }),
       });
       setCreateOpen(false);
-      await loadData();
+      await loadIncidents();
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "No se pudo registrar la incidencia");
     } finally {
@@ -151,7 +164,7 @@ export default function IncidentsPage() {
         }),
       });
       setManageOpen(false);
-      await loadData();
+      await loadIncidents();
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "No se pudo actualizar la incidencia");
     } finally {
@@ -168,17 +181,17 @@ export default function IncidentsPage() {
       />
       {error && <ErrorBanner message={error} />}
       <section className="panel mb-4 flex flex-col gap-3 p-3 sm:flex-row">
-        <label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={17} /><input className="field field-with-icon" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por incidencia, activo o codigo" /></label>
-        <select className="field sm:w-52" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">Todos los estados</option><option value="OPEN">Abiertas</option><option value="ASSIGNED">Asignadas</option><option value="IN_PROGRESS">En curso</option><option value="WAITING">En espera</option><option value="RESOLVED">Resueltas</option><option value="CLOSED">Cerradas</option></select>
+        <label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={17} /><input className="field field-with-icon" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar por incidencia, activo o codigo" /></label>
+        <select className="field sm:w-52" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}><option value="">Todos los estados</option><option value="OPEN">Abiertas</option><option value="ASSIGNED">Asignadas</option><option value="IN_PROGRESS">En curso</option><option value="WAITING">En espera</option><option value="RESOLVED">Resueltas</option><option value="CLOSED">Cerradas</option></select>
       </section>
 
       {loading ? <LoadingBlock /> : (
         <section className="panel overflow-hidden">
-          {filtered.length === 0 ? <EmptyState title="No hay incidencias coincidentes" detail="Ajusta los filtros o registra un nuevo evento de planta." /> : (
+          {incidents.length === 0 ? <EmptyState title="No hay incidencias coincidentes" detail="Ajusta los filtros o registra un nuevo evento de planta." /> : (
             <div className="table-wrap">
               <table className="data-table">
                 <thead><tr><th>Incidencia</th><th>Activo</th><th>Prioridad</th><th>Estado</th><th>Asignacion</th><th>Parada</th><th className="w-16">Accion</th></tr></thead>
-                <tbody>{filtered.map((incident) => (
+                <tbody>{incidents.map((incident) => (
                   <tr key={incident.id}>
                     <td className="max-w-75"><p className="truncate font-bold text-[var(--ink)]">{incident.title}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{formatDate(incident.reported_at, true)}</p></td>
                     <td><p className="font-semibold text-[var(--ink)]">{incident.asset.code}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{incident.asset.name}</p></td>
@@ -192,6 +205,7 @@ export default function IncidentsPage() {
               </table>
             </div>
           )}
+          {pageData && <PaginationBar noun="incidencias" page={pageData.page} pages={pageData.pages} total={pageData.total} onPageChange={setPage} />}
         </section>
       )}
 

@@ -1,0 +1,44 @@
+name: Release production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version already validated in staging
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: railway-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: v${{ inputs.version }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - run: npm install --global @railway/cli@5.37.7
+      - name: Deploy backend
+        run: railway up --service backend --environment production --ci
+      - name: Deploy worker
+        run: railway up --service worker --environment production --ci
+      - name: Deploy frontend
+        run: railway up --service frontend --environment production --ci
+      - name: Validate production
+        env:
+          PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL }}
+          PRODUCTION_APP_URL: ${{ vars.PRODUCTION_APP_URL }}
+        run: |
+          curl --fail --silent --show-error "$PRODUCTION_API_URL/ready"
+          curl --fail --silent --show-error "$PRODUCTION_APP_URL/login" > /dev/null

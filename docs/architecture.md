@@ -1,6 +1,30 @@
 # Arquitectura de ForgeOps
 
-ForgeOps V1.1 es un monolito modular multiempresa con dos aplicaciones desplegables, almacenamiento documental privado y PostgreSQL con `pgvector`.
+> Estado: Production Foundation V1.2.1. Las decisiones completas estan en `docs/adr/`.
+
+ForgeOps es un monorepo con frontend Next.js, API FastAPI, worker RQ, PostgreSQL/pgvector, Redis y almacenamiento S3 compatible. Frontend, backend y worker son contenedores independientes y stateless. PostgreSQL, Redis y S3 son los unicos almacenes persistentes.
+
+```mermaid
+flowchart TB
+  UI["Next.js PWA"] --> API["FastAPI /api/v1"]
+  CTRL["/control + MFA"] --> API
+  API --> DB["PostgreSQL + RLS + pgvector"]
+  API --> REDIS["Redis rate limit + RQ"]
+  WORKER["RQ worker"] --> REDIS
+  WORKER --> DB
+  API --> S3["S3 privado"]
+  WORKER --> S3
+  API --> SMTP["SMTP"]
+  API --> MON["JSON logs / Sentry opcional"]
+```
+
+El dominio se divide en empresas, usuarios, plantas, activos, incidencias, ordenes, preventivos, inventario, documentos/RAG, onboarding, auditoria, jobs y operadores. Cada modulo conserva rutas, esquemas, servicio y modelos propios.
+
+La API usa `/api/v1`; cambios incompatibles se publicaran en una version nueva. La capa de entitlements resuelve plan, modulos, flags y limites sin dispersar condicionales comerciales. La capa de storage evita acoplamiento con Railway. Los contratos de integraciones industriales permanecen separados y no se ejecutan dentro de requests HTTP.
+
+Para detalles consultar [multi-tenancy-security.md](multi-tenancy-security.md), [storage.md](storage.md), [pwa.md](pwa.md) y [railway-production.md](railway-production.md).
+
+ForgeOps V1.2 es un monolito modular multiempresa con dos aplicaciones desplegables, almacenamiento documental privado y PostgreSQL con `pgvector`.
 
 ```text
 Browser -> Next.js -> FastAPI -> PostgreSQL + pgvector
@@ -27,6 +51,7 @@ documents   archivos privados
 ai          ingesta, recuperacion y RAG
 dashboard   KPIs y onboarding
 onboarding  progreso individual y tutorial guiado
+operators   identidad propietaria y gobierno de plataforma
 ```
 
 ## Decisiones
@@ -44,6 +69,8 @@ onboarding  progreso individual y tutorial guiado
 - Suscripcion y modulos resueltos en el contexto de empresa, nunca desde el navegador.
 - Caducidad de pruebas evaluada en cada acceso y escritura bloqueada con HTTP 402.
 - Nucleo operativo siempre activo; modulos opcionales protegidos tanto en API como en UI.
+- Identidad de operador separada de usuarios tenant, con tokens, sesiones, cookie y auditoria propios.
+- MFA TOTP obligatorio para `/control`, codigos no reutilizables y bloqueo temporal por intentos.
 
 ## Modulos comerciales
 
@@ -54,6 +81,10 @@ El registro de prueba crea empresa, administrador y planta dentro de una unica t
 ## Limites de dominio
 
 Los servicios validan relaciones cruzadas antes de escribir: una orden no puede apuntar a un activo de otra planta, un responsable debe pertenecer a la empresa y un documento solo se recupera dentro de su tenant. Desactivar usuarios revoca sesiones; eliminar el ultimo administrador o desactivar una planta con activos se rechaza.
+
+## Plano de control
+
+`PlatformOperator` no tiene `company_id` y no reutiliza el rol `SUPER_ADMIN`. Su token declara el actor `operator`; las dependencias tenant rechazan esos tokens y las dependencias del backoffice rechazan tokens de clientes. El plano de control ofrece agregados comerciales y operativos, pero no rutas para leer incidencias, documentos o conocimiento de una empresa. Suspensiones, ampliaciones y cambios de modulos conservan operador, IP, motivo y estado anterior en `operator_audit_events`.
 
 ## Inteligencia documental
 

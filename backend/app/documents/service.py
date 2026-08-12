@@ -5,11 +5,12 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.assets.models import Asset
+from app.companies.entitlements import enforce_limit
 from app.core.config import settings
 from app.core.enums import DocumentType
 from app.documents.models import TechnicalDocument
 from app.documents.schemas import TechnicalDocumentUpdate
-from app.documents.storage import LocalDocumentStorage
+from app.documents.storage import StorageService
 from app.users.models import User
 
 
@@ -62,7 +63,7 @@ def get_document(db: Session, company_id: uuid.UUID, document_id: uuid.UUID) -> 
 async def create_document(
     db: Session,
     current_user: User,
-    storage: LocalDocumentStorage,
+    storage: StorageService,
     asset_id: uuid.UUID,
     name: str,
     document_type: DocumentType,
@@ -74,33 +75,40 @@ async def create_document(
     )
     if not asset:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Activo no valido"
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Activo no valido"
         )
 
     content = await upload.read(settings.max_upload_bytes + 1)
     await upload.close()
     if not content:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Archivo vacio"
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Archivo vacio"
         )
     if len(content) > settings.max_upload_bytes:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail="El archivo supera el limite permitido",
         )
 
-    original_name = upload.filename or "documento"
-    storage_key = storage.store(current_user.company_id, original_name, content)
+    enforce_limit(db, current_user.company, "storage_bytes", len(content))
+
+    stored = storage.store(
+        current_user.company_id,
+        asset_id,
+        upload.filename or "documento",
+        content,
+        upload.content_type,
+    )
     document = TechnicalDocument(
         company_id=current_user.company_id,
         asset_id=asset_id,
         uploaded_by=current_user.id,
         name=name.strip(),
         type=document_type,
-        storage_key=storage_key,
-        original_name=original_name[:255],
-        mime_type=(upload.content_type or "application/octet-stream")[:120],
-        file_size=len(content),
+        storage_key=stored.key,
+        original_name=stored.original_name,
+        mime_type=stored.mime_type,
+        file_size=stored.size,
         description=description.strip() if description else None,
     )
     db.add(document)
@@ -108,7 +116,7 @@ async def create_document(
         db.commit()
     except Exception:
         db.rollback()
-        storage.delete(storage_key)
+        storage.delete(current_user.company_id, stored.key)
         raise
     return get_document(db, current_user.company_id, document.id)
 
@@ -130,10 +138,10 @@ def delete_document(
     db: Session,
     company_id: uuid.UUID,
     document_id: uuid.UUID,
-    storage: LocalDocumentStorage,
+    storage: StorageService,
 ) -> None:
     document = get_document(db, company_id, document_id)
     storage_key = document.storage_key
     db.delete(document)
     db.commit()
-    storage.delete(storage_key)
+    storage.delete(company_id, storage_key)

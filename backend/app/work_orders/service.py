@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.assets.models import Asset
 from app.core.enums import Priority, UserRole, WorkOrderStatus
+from app.core.pagination import paginate
 from app.incidents.models import Incident
 from app.users.models import User
 from app.work_orders.models import WorkOrder
@@ -58,7 +59,53 @@ def list_work_orders(
         query = query.where(WorkOrder.priority == priority)
     if plant_id:
         query = query.where(WorkOrder.plant_id == plant_id)
-    return list(db.scalars(query.order_by(WorkOrder.created_at.desc())))
+    return list(db.scalars(query.order_by(WorkOrder.created_at.desc()).limit(500)))
+
+
+def page_work_orders(
+    db: Session,
+    current_user: User,
+    search: str | None,
+    order_status: WorkOrderStatus | None,
+    priority: Priority | None,
+    plant_id: uuid.UUID | None,
+    page: int,
+    page_size: int,
+    sort: str,
+):
+    query = _base_query().where(WorkOrder.company_id == current_user.company_id)
+    if current_user.role == UserRole.TECHNICIAN:
+        query = query.where(WorkOrder.assigned_to == current_user.id)
+    if search:
+        term = f"%{search.strip()}%"
+        query = query.join(WorkOrder.asset).where(
+            or_(WorkOrder.number.ilike(term), WorkOrder.title.ilike(term), Asset.code.ilike(term))
+        )
+    if order_status:
+        query = query.where(WorkOrder.status == order_status)
+    if priority:
+        query = query.where(WorkOrder.priority == priority)
+    if plant_id:
+        query = query.where(WorkOrder.plant_id == plant_id)
+    order_by = {
+        "created": WorkOrder.created_at.desc(),
+        "scheduled": WorkOrder.scheduled_date.asc().nullslast(),
+        "number": WorkOrder.number.desc(),
+    }[sort]
+    return paginate(
+        db,
+        query.order_by(order_by),
+        page,
+        page_size,
+        sort,
+        {
+            "search": search,
+            "status": order_status.value if order_status else None,
+            "priority": priority.value if priority else None,
+            "plant_id": str(plant_id) if plant_id else None,
+        },
+        unique=True,
+    )
 
 
 def get_work_order(db: Session, current_user: User, order_id: uuid.UUID) -> WorkOrder:

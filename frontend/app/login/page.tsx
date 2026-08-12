@@ -2,6 +2,7 @@
 
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Factory, Gauge, LockKeyhole, Mail, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
@@ -112,6 +113,7 @@ export default function LoginPage() {
                 {error && <AuthError message={error} />}
                 <InputField label="Correo electronico" icon={Mail}><input className="field field-with-icon" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" /></InputField>
                 <InputField label="Contrasena" icon={LockKeyhole}><input className="field field-with-icon" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required autoComplete="current-password" /></InputField>
+                <div className="flex justify-end"><Link href="/forgot-password" className="text-xs font-bold text-[var(--accent)]">He olvidado mi contrasena</Link></div>
                 <button className="button-primary h-11 w-full justify-center" disabled={submitting}>{submitting ? <span className="loader loader-light" /> : <>Entrar a ForgeOps <ArrowRight size={18} /></>}</button>
               </form>
               <div className="my-6 flex items-center gap-3"><div className="h-px flex-1 bg-[var(--line)]" /><span className="text-[11px] font-bold uppercase text-[var(--muted)]">o prueba tu empresa</span><div className="h-px flex-1 bg-[var(--line)]" /></div>

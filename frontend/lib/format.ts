@@ -41,6 +41,16 @@ const labels: Record<string, string> = {
   READY: "Disponible",
   FAILED: "Error",
   UNSUPPORTED: "No compatible",
+  TRIAL: "Prueba",
+  SUSPENDED: "Suspendida",
+  EXPIRED: "Caducada",
+  DEMO: "Demo",
+  PROFESSIONAL: "Profesional",
+  STARTER: "Starter",
+  PRO: "Pro",
+  INDUSTRIAL: "Industrial",
+  ENTERPRISE: "Enterprise",
+  INACTIVE: "Inactiva",
 };
 
 export function labelFor(value: string): string {

@@ -1,12 +1,13 @@
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user, require_module, require_roles
 from app.core.database import get_db
 from app.core.enums import CompanyModule, DocumentType, UserRole
+from app.core.rate_limit import rate_limit
 from app.documents.schemas import TechnicalDocumentRead, TechnicalDocumentUpdate
 from app.documents.service import (
     create_document,
@@ -15,7 +16,7 @@ from app.documents.service import (
     list_documents,
     update_document,
 )
-from app.documents.storage import LocalDocumentStorage, get_document_storage
+from app.documents.storage import StorageService, get_document_storage
 from app.users.models import User
 
 router = APIRouter(
@@ -40,7 +41,12 @@ def index(
     )
 
 
-@router.post("", response_model=TechnicalDocumentRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=TechnicalDocumentRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit("document_upload", "rate_limit_upload"))],
+)
 async def store(
     asset_id: uuid.UUID = Form(),
     name: str = Form(min_length=3, max_length=180),
@@ -49,7 +55,7 @@ async def store(
     file: UploadFile = File(),
     db: Session = Depends(get_db),
     current_user: User = Depends(managers),
-    storage: LocalDocumentStorage = Depends(get_document_storage),
+    storage: StorageService = Depends(get_document_storage),
 ):
     return await create_document(
         db, current_user, storage, asset_id, name, document_type, description, file
@@ -80,11 +86,14 @@ def download(
     document_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    storage: LocalDocumentStorage = Depends(get_document_storage),
+    storage: StorageService = Depends(get_document_storage),
 ):
     document = get_document(db, current_user.company_id, document_id)
+    target = storage.download(current_user.company_id, document.storage_key)
+    if target.signed_url:
+        return RedirectResponse(target.signed_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     return FileResponse(
-        path=storage.path_for(document.storage_key),
+        path=target.local_path,
         filename=document.original_name,
         media_type=document.mime_type,
     )
@@ -95,7 +104,7 @@ def destroy(
     document_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(managers),
-    storage: LocalDocumentStorage = Depends(get_document_storage),
+    storage: StorageService = Depends(get_document_storage),
 ):
     delete_document(db, current_user.company_id, document_id, storage)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

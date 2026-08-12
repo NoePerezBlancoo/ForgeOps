@@ -13,7 +13,7 @@ def test_docx_extraction_includes_paragraphs_and_tables(tmp_path):
     table.cell(0, 1).text = "Aislar energia"
     document.save(path)
 
-    sections = extract_sections(path, path.name, max_chars=10_000)
+    sections = extract_sections(path.read_bytes(), path.name, max_chars=10_000)
 
     assert len(sections) == 1
     assert "Procedimiento de seguridad para mantenimiento" in sections[0].text

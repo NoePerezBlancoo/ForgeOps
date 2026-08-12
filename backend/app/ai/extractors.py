@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 
 from docx import Document
@@ -19,14 +20,14 @@ class ExtractedSection:
     page_number: int | None = None
 
 
-def extract_sections(path: Path, original_name: str, max_chars: int) -> list[ExtractedSection]:
+def extract_sections(content: bytes, original_name: str, max_chars: int) -> list[ExtractedSection]:
     extension = Path(original_name).suffix.lower()
     if extension == ".txt":
-        sections = _extract_text(path)
+        sections = _extract_text(content)
     elif extension == ".pdf":
-        sections = _extract_pdf(path)
+        sections = _extract_pdf(content)
     elif extension == ".docx":
-        sections = _extract_docx(path)
+        sections = _extract_docx(content)
     else:
         raise UnsupportedDocumentError(
             "El formato no dispone de extraccion de texto. Usa TXT, PDF o DOCX."
@@ -44,8 +45,7 @@ def extract_sections(path: Path, original_name: str, max_chars: int) -> list[Ext
     return clean_sections
 
 
-def _extract_text(path: Path) -> list[ExtractedSection]:
-    content = path.read_bytes()
+def _extract_text(content: bytes) -> list[ExtractedSection]:
     for encoding in ("utf-8-sig", "utf-8", "latin-1"):
         try:
             return [ExtractedSection(content.decode(encoding))]
@@ -54,8 +54,8 @@ def _extract_text(path: Path) -> list[ExtractedSection]:
     raise EmptyDocumentError("No se pudo decodificar el archivo de texto")
 
 
-def _extract_pdf(path: Path) -> list[ExtractedSection]:
-    reader = PdfReader(str(path))
+def _extract_pdf(content: bytes) -> list[ExtractedSection]:
+    reader = PdfReader(BytesIO(content))
     if reader.is_encrypted:
         try:
             reader.decrypt("")
@@ -67,8 +67,8 @@ def _extract_pdf(path: Path) -> list[ExtractedSection]:
     ]
 
 
-def _extract_docx(path: Path) -> list[ExtractedSection]:
-    document = Document(str(path))
+def _extract_docx(content: bytes) -> list[ExtractedSection]:
+    document = Document(BytesIO(content))
     blocks = [paragraph.text for paragraph in document.paragraphs if paragraph.text.strip()]
     for table in document.tables:
         for row in table.rows:

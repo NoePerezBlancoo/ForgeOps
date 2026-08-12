@@ -6,7 +6,7 @@ from app.ai.service import index_documents
 from app.assets.models import Asset
 from app.auth.security import hash_password
 from app.companies.models import Company
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, set_database_context
 from app.core.enums import (
     AssetStatus,
     CompanyPlan,
@@ -745,6 +745,7 @@ def get_or_create_documents(db, company, assets, users) -> None:
 
 def seed() -> None:
     with SessionLocal() as db:
+        set_database_context(db, "system")
         company = get_or_create_company(db)
         plant = get_or_create_plant(db, company)
         users = get_or_create_users(db, company)

@@ -1,177 +1,126 @@
 # ForgeOps
 
-ForgeOps es una plataforma SaaS B2B para digitalizar el mantenimiento de pequenas y medianas empresas industriales. Sustituye hojas de calculo, papel y conversaciones dispersas por una operacion trazable sobre plantas, activos, incidencias, ordenes, preventivos, repuestos y documentacion tecnica.
+ForgeOps es una plataforma SaaS B2B multiempresa para mantenimiento industrial. Centraliza plantas, activos, incidencias, ordenes, preventivos, repuestos, documentacion tecnica e inteligencia documental con trazabilidad por usuario.
 
-La V1.1 esta preparada para demostraciones comerciales autogestionadas y pilotos controlados. Cada evaluador puede crear un entorno privado durante 30 dias, seguir un tutorial integrado y activar solo los modulos que necesita su empresa.
+La version **1.2.1 Production Foundation** convierte el piloto funcional en una base desplegable y operable: servicios stateless, aislamiento PostgreSQL RLS, storage S3, Redis/worker, planes y limites, PWA, backoffice propietario, CI/CD y runbooks de recuperacion.
 
-## Capacidades V1.1
+## Producto
 
-- Alta autogestionada de pruebas de 30 dias, con espacio multiempresa aislado.
-- Datos de ejemplo opcionales para empezar a evaluar el producto inmediatamente.
-- Caducidad calculada en tiempo real y bloqueo de escritura al finalizar la prueba.
-- Gestion operativa de ampliacion, activacion o suspension de suscripciones.
-- Centro de primeros pasos con progreso automatico y tutorial de flujo completo.
-- Ayuda contextual siempre disponible desde la aplicacion.
-- Nucleo operativo estable y modulos opcionales por empresa.
+- Dashboard operativo y preparacion del piloto.
+- Activos, criticidad, estado y contexto de planta.
+- Incidencias y ordenes con asignacion, prioridad e historial.
+- Listados de activos, incidencias y ordenes paginados y filtrados en servidor.
+- Preventivos, inventario y movimientos de repuesto.
+- Documentos privados, extraccion, pgvector y RAG con fuentes.
+- Usuarios y roles por empresa.
+- Trial autogestionado de 30 dias y onboarding integrado.
+- Planes Demo, Trial, Starter, Pro, Industrial y Enterprise.
+- Limites de usuarios, plantas, activos y almacenamiento.
+- Backoffice `/control` con identidad independiente, MFA y auditoria.
+- PWA instalable y cola local restringida para borradores compatibles.
 
-- Autenticacion JWT con access token corto y refresh token rotatorio en cookie `HttpOnly`.
-- Roles `SUPER_ADMIN`, `ADMIN`, `MAINTENANCE_MANAGER`, `TECHNICIAN` y `VIEWER`.
-- Aislamiento logico por empresa en todos los datos operativos y documentales.
-- Perfil de empresa, zona horaria, formato regional y prefijo configurable de ordenes.
-- Plantas administrables y selector global que filtra la operacion real.
-- Usuarios, puestos, roles, activacion, restablecimiento de contrasena y cierre de sesiones.
-- Registro de auditoria para accesos y cambios administrativos.
-- Indicador de preparacion para piloto y accesos directos a pasos pendientes.
-- Activos industriales con criticidad, ubicacion, fabricante y estado.
-- Incidencias con prioridad, responsable, tiempos de parada, causa y resolucion.
-- Ordenes correctivas, preventivas, de inspeccion y mejora.
-- Preventivos recurrentes con generacion idempotente de ordenes.
-- Inventario con stock minimo y movimientos inmutables.
-- Documentos privados vinculados a activos con extraccion TXT, PDF y DOCX.
-- Asistente documental local o RAG OpenAI opcional, siempre con fuentes descargables.
-- Dashboard operativo con disponibilidad, carga, paradas y alertas.
-- API OpenAPI, migraciones Alembic, datos demo idempotentes y CI.
-
-## Stack
+## Arquitectura
 
 ```text
-Frontend    Next.js 16, React 19, TypeScript, Tailwind CSS
-Backend     FastAPI, SQLAlchemy 2, Pydantic 2, Alembic
-Datos       PostgreSQL 17, pgvector
-IA opcional OpenAI Responses API, text-embedding-3-small
-Ejecucion   Docker Compose
+Next.js PWA  ->  FastAPI /api/v1  ->  PostgreSQL + RLS + pgvector
+                         |         ->  Redis -> RQ worker
+                         |         ->  S3 compatible
+                         |         ->  SMTP / Sentry opcional
+Platform Control /control --------> agregados y gobierno comercial
 ```
 
-ForgeOps mantiene un monolito modular deliberado. Consulta [Arquitectura](docs/architecture.md), [Inteligencia documental](docs/document-intelligence.md), [Demo comercial](docs/commercial-demo.md) y [Despliegue de piloto](docs/pilot-deployment.md).
+Frontend, API y worker son contenedores independientes. Las sesiones viven en PostgreSQL; los jobs se persisten cifrados e idempotentes antes de entrar en Redis; los documentos nunca dependen del disco del contenedor en produccion.
 
-Para una demo publica de un solo dominio se incluye `docker-compose.demo.yml`, con HTTPS automatico mediante Caddy, PostgreSQL privado y persistencia documental.
+## Inicio local
 
-## Inicio rapido
-
-Requisitos: Docker Desktop y los puertos `3000`, `8000` y `5432` disponibles.
+Requisitos: Docker Desktop y Docker Compose.
 
 ```powershell
+git clone https://github.com/NoePerezBlancoo/Mantenimiento.git forgeops
+Set-Location forgeops
 Copy-Item .env.example .env
-docker compose up -d --build
-```
-
-- Aplicacion: http://localhost:3000
-- Swagger: http://localhost:8000/docs
-- Healthcheck: http://localhost:8000/health
-- Readiness: http://localhost:8000/ready
-
-El backend aplica migraciones y carga datos demo automaticamente. La semilla se puede ejecutar repetidamente sin duplicar registros ni fragmentos documentales.
-
-Desde la pantalla de acceso se puede crear una empresa de prueba. El registro abre directamente `/getting-started`, prepara una planta y, si se solicita, incorpora datos de ejemplo aislados.
-
-En produccion usa `SEED_DEMO_DATA=false` y crea el primer acceso con `python -m scripts.bootstrap_admin`, tal como se documenta en la guia de despliegue.
-
-## Acceso demo
-
-```text
-Email:    admin@metalworks-demo.local
-Password: Admin123!
-Rol:      ADMIN
-```
-
-Estas credenciales solo son validas para desarrollo y demostracion.
-
-## Inteligencia documental
-
-`AI_PROVIDER=local` es el modo predeterminado. No necesita claves externas y responde de forma extractiva con citas. Para activar embeddings y generacion:
-
-```dotenv
-AI_PROVIDER=openai
-OPENAI_API_KEY=replace-with-a-server-side-key
-OPENAI_CHAT_MODEL=gpt-5
-OPENAI_EMBEDDING_MODEL=text-embedding-3-small
-```
-
-La clave permanece en el backend. Tras cambiar de proveedor se deben reindexar los documentos desde el panel de inteligencia.
-
-## Comandos
-
-```powershell
-docker compose up -d --build
+docker compose up --build -d
 docker compose ps
-docker compose logs -f
-docker compose exec backend alembic upgrade head
-docker compose exec backend python -m scripts.seed_demo
-docker compose exec backend pytest
-docker compose exec backend ruff check app scripts tests alembic
-docker compose exec frontend npm run lint
-docker compose exec frontend npm run typecheck
-docker compose down
 ```
 
-Reinicio completo de datos locales:
+- Aplicacion: `http://localhost:3000`
+- API: `http://localhost:8000/api/v1`
+- OpenAPI local: `http://localhost:8000/docs`
+- Control propietario: `http://localhost:3000/control/login`
+- Health: `http://localhost:8000/health`
+- Readiness: `http://localhost:8000/ready`
+
+El entorno local carga una empresa de ejemplo si `SEED_DEMO_DATA=true`. Las credenciales se muestran en la interfaz solo cuando `NEXT_PUBLIC_DEMO_CREDENTIALS=true`.
+
+## Operador ForgeOps
 
 ```powershell
-docker compose down -v
+$env:OPERATOR_BOOTSTRAP_NAME="ForgeOps Owner"
+$env:OPERATOR_BOOTSTRAP_EMAIL="owner@example.com"
+$env:OPERATOR_BOOTSTRAP_PASSWORD="UnaContrasenaSegura123!"
+docker compose exec backend python -m scripts.bootstrap_operator
 ```
 
-## API principal
-
-```text
-/api/v1/auth                    autenticacion, contrasena y sesiones
-/api/v1/auth/register-trial     alta publica de prueba
-/api/v1/companies               empresa actual y configuracion
-/api/v1/plants                  plantas y estado
-/api/v1/users                   equipo, roles y credenciales
-/api/v1/audit-events            trazabilidad administrativa
-/api/v1/assets                  activos industriales
-/api/v1/incidents               incidencias
-/api/v1/work-orders             ordenes de trabajo
-/api/v1/preventive-maintenance  planes preventivos
-/api/v1/inventory               repuestos y movimientos
-/api/v1/documents               archivos tecnicos privados
-/api/v1/ai                      indexacion y consultas documentales
-/api/v1/dashboard               KPIs y preparacion del piloto
-/api/v1/onboarding              progreso y tutorial integrado
-```
-
-## Seguridad
-
-- Hash Argon2 para contrasenas y politica minima de complejidad.
-- Refresh tokens almacenados como hash y revocables.
-- Sesiones cerradas al cambiar contrasena o desactivar un usuario.
-- Proteccion del ultimo administrador activo.
-- Descargas autenticadas y almacenamiento fuera del directorio publico.
-- Cabeceras defensivas, CORS explicito y validacion estricta en produccion.
-- Claves y secretos excluidos del repositorio.
-
-`APP_ENV=production` exige una clave distinta de la predeterminada, cookies seguras y un `FRONTEND_URL` no local. Consulta la guia de despliegue antes de exponer un piloto.
+El comando entrega una vez el secreto/URI TOTP. No se comparte con cuentas de empresa.
 
 ## Calidad
 
-La suite cubre autenticacion, permisos, multiempresa, operaciones de mantenimiento, inventario, documentos, RAG, administracion, ultimo administrador, revocacion de sesiones, auditoria, filtros de planta, extraccion e idempotencia. GitHub Actions ejecuta Ruff, Pytest, ESLint, TypeScript y la build de Next.js en cada cambio.
-
-## Gestion de pruebas
-
-Ampliar una prueba:
-
 ```powershell
-docker compose exec backend python -m scripts.manage_subscription --email owner@example.com --extend-trial 15
+docker compose exec -T backend ruff check app scripts tests alembic
+docker compose exec -T backend pytest
+docker compose exec -T backend alembic check
+docker compose exec -T backend python -m scripts.check_migrations
+docker compose exec -T frontend npm run lint
+docker compose exec -T frontend npm run typecheck
+docker compose exec -T frontend npm test
+docker compose exec -T frontend npm run build
+docker compose config --quiet
 ```
 
-Convertirla a plan profesional:
+GitHub Actions repite estas comprobaciones con PostgreSQL y Redis reales, prueba ataques tenant/RLS, audita dependencias, busca secretos y construye las imagenes.
 
-```powershell
-docker compose exec backend python -m scripts.manage_subscription --email owner@example.com --plan PROFESSIONAL --status ACTIVE
-```
+## Seguridad
 
-## Alcance del piloto
+- Argon2, JWT corto y refresh rotatorio `HttpOnly`.
+- MFA TOTP obligatorio y bloqueo para operadores.
+- Autorizacion por rol y proteccion del ultimo administrador.
+- Aislamiento por empresa en servicios y PostgreSQL RLS forzado.
+- Rol runtime PostgreSQL sin superusuario ni bypass.
+- CORS explicito, cookies seguras, headers defensivos y rate limit Redis.
+- Archivos por UUID, validacion MIME/firma, bucket privado y URL firmada.
+- Errores sin traces con request/correlation ID y logs JSON.
+- Recuperacion de errores de interfaz con referencia de soporte.
+- Configuracion de produccion fail-fast ante valores inseguros.
 
-V1.1 incorpora aprovisionamiento automatizado de empresas y ciclo de prueba. Para explotacion SaaS publica todavia deben integrarse facturacion, correo transaccional, almacenamiento cloud, monitorizacion centralizada y los textos legales definitivos del titular.
+## Despliegue
 
-## Hoja de ruta
+Railway es la plataforma objetivo inicial. El repositorio contiene Config as Code para frontend, backend y worker, ejemplos completos por entorno y una topologia con PgBouncer, PostgreSQL HA, Redis y Bucket.
 
-- **V0.1:** activos, incidencias, ordenes y dashboard. Completada.
-- **V0.2:** preventivos, inventario y documentos. Completada.
-- **V0.3:** ingesta documental y RAG verificable. Completada.
-- **V1.0:** administracion, seguridad, auditoria, contexto de planta y piloto comercial. Completada.
-- **V1.1:** prueba de 30 dias, onboarding guiado y configuracion modular. Completada.
-- **Siguiente:** facturacion, correo transaccional, OPC UA, MQTT, ERP y observabilidad cloud.
+El despliegue externo requiere crear y financiar la cuenta Railway, configurar dominios/DNS, SMTP, secrets, bucket, backups/PITR y aprobaciones de GitHub. No hay credenciales reales en el repositorio.
+
+Guias principales:
+
+- [Arquitectura](docs/architecture.md)
+- [Despliegue](docs/deployment.md)
+- [Railway](docs/railway-production.md)
+- [Runbook](docs/production-runbook.md)
+- [Release](docs/release-process.md)
+- [Backup y recovery](docs/backup-and-recovery.md)
+- [Multi-tenancy](docs/multi-tenancy-security.md)
+- [Seguridad](docs/security.md)
+- [Storage](docs/storage.md)
+- [PWA](docs/pwa.md)
+- [Privacidad](docs/data-privacy-architecture.md)
+- [Guia cloud para cliente](docs/customer-cloud-security.md)
+- [Decisiones ADR](docs/adr/)
+
+## Estado
+
+Implementado y probado localmente: nucleo operativo, backoffice MFA, planes/limites, RLS, storage abstraction, Redis/worker, password reset, PWA, Docker y tests.
+
+Preparado pero dependiente de configuracion externa: Railway staging/production, dominios publicos, PostgreSQL HA/PgBouncer gestionados, Bucket, SMTP, Sentry y PITR.
+
+Fuera de V1.2.1: facturacion automatica, exportacion/destruccion completa de tenant, antivirus gestionado, OPC UA/MQTT/ERP productivos y SSO Enterprise.
 
 ## Licencia
 

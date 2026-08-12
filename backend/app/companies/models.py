@@ -46,6 +46,8 @@ class Company(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         default=lambda: list(DEFAULT_COMPANY_MODULES),
         nullable=False,
     )
+    limit_overrides: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    feature_overrides: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
     users: Mapped[list["User"]] = relationship(back_populates="company")  # noqa: F821

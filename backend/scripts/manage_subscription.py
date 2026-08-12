@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 
 from app.companies.models import Company
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, set_database_context
 from app.core.enums import CompanyPlan, SubscriptionStatus
 from app.models import *  # noqa: F403
 from app.users.models import User
@@ -40,6 +40,7 @@ def main() -> None:
         raise SystemExit("La ampliacion debe estar entre 1 y 90 dias")
 
     with SessionLocal() as db:
+        set_database_context(db, "system")
         user = db.scalar(select(User).where(User.email == args.email.lower().strip()))
         if not user:
             raise SystemExit("No existe ningun usuario con ese correo")

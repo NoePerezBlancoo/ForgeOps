@@ -1,4 +1,5 @@
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -6,12 +7,14 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user, require_roles
 from app.core.database import get_db
 from app.core.enums import Priority, UserRole, WorkOrderStatus
+from app.core.schemas import Page
 from app.users.models import User
 from app.work_orders.schemas import WorkOrderCreate, WorkOrderRead, WorkOrderUpdate
 from app.work_orders.service import (
     create_work_order,
     get_work_order,
     list_work_orders,
+    page_work_orders,
     update_work_order,
 )
 
@@ -32,6 +35,31 @@ def index(
     current_user: User = Depends(get_current_user),
 ) -> list:
     return list_work_orders(db, current_user, search, order_status, priority, plant_id)
+
+
+@router.get("/page", response_model=Page[WorkOrderRead])
+def paginated_index(
+    search: str | None = Query(default=None, max_length=100),
+    order_status: WorkOrderStatus | None = Query(default=None, alias="status"),
+    priority: Priority | None = None,
+    plant_id: uuid.UUID | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=10, le=100),
+    sort: Literal["created", "scheduled", "number"] = "created",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Page[WorkOrderRead]:
+    return page_work_orders(
+        db,
+        current_user,
+        search,
+        order_status,
+        priority,
+        plant_id,
+        page,
+        page_size,
+        sort,
+    )
 
 
 @router.get("/{order_id}", response_model=WorkOrderRead)

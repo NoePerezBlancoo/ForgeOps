@@ -8,6 +8,8 @@ from app.auth.dependencies import get_current_user
 from app.auth.models import RefreshSession
 from app.auth.schemas import (
     LoginRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
     RefreshRequest,
     SessionRead,
     SessionsRevokedRead,
@@ -18,7 +20,9 @@ from app.auth.schemas import (
 from app.auth.security import token_digest
 from app.auth.service import (
     authenticate,
+    confirm_password_reset,
     issue_session,
+    request_password_reset,
     revoke_session,
     rotate_session,
     token_expires_in,
@@ -26,6 +30,7 @@ from app.auth.service import (
 from app.companies.trial_service import register_trial
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.rate_limit import rate_limit
 from app.core.schemas import MessageResponse
 from app.users.models import User
 from app.users.schemas import UserRead
@@ -42,12 +47,18 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
         max_age=settings.refresh_token_days * 86400,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="lax",
+        samesite=settings.cookie_samesite,
+        domain=settings.cookie_domain,
         path="/api/v1/auth",
     )
 
 
-@router.post("/register-trial", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register-trial",
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit("trial_signup", "rate_limit_trial_signup"))],
+)
 def create_trial(
     payload: TrialRegistration,
     request: Request,
@@ -66,7 +77,11 @@ def create_trial(
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    dependencies=[Depends(rate_limit("user_login", "rate_limit_login"))],
+)
 def login(
     payload: LoginRequest,
     request: Request,
@@ -83,6 +98,36 @@ def login(
         expires_in=token_expires_in(),
         user=UserRead.model_validate(user),
     )
+
+
+@router.post(
+    "/password-reset/request",
+    response_model=MessageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(rate_limit("password_reset", "rate_limit_password_reset"))],
+)
+def password_reset_request(
+    payload: PasswordResetRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    request_password_reset(db, payload.email, request.client.host if request.client else None)
+    return MessageResponse(
+        message="Si la cuenta existe, recibiras un enlace de recuperacion en unos minutos"
+    )
+
+
+@router.post(
+    "/password-reset/confirm",
+    response_model=MessageResponse,
+    dependencies=[Depends(rate_limit("password_reset_confirm", "rate_limit_password_reset"))],
+)
+def password_reset_confirm(
+    payload: PasswordResetConfirm,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    confirm_password_reset(db, payload)
+    return MessageResponse(message="Contrasena actualizada. Ya puedes iniciar sesion")
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -115,7 +160,13 @@ def logout(
     db: Session = Depends(get_db),
 ) -> MessageResponse:
     revoke_session(db, cookie_token or (payload.refresh_token if payload else None))
-    response.delete_cookie(REFRESH_COOKIE, path="/api/v1/auth")
+    response.delete_cookie(
+        REFRESH_COOKIE,
+        path="/api/v1/auth",
+        domain=settings.cookie_domain,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+    )
     return MessageResponse(message="Sesion cerrada")
 
 
