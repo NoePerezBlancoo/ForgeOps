@@ -4,7 +4,7 @@ import secrets
 import time
 import uuid
 
-import httpx
+import httpx2 as httpx
 import pyotp
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
