@@ -1,0 +1,38 @@
+{
+  "name": "ForgeOps Industrial CMMS",
+  "short_name": "ForgeOps",
+  "description": "Gestion profesional de mantenimiento y operaciones industriales.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#eef1ef",
+  "theme_color": "#142021",
+  "lang": "es",
+  "orientation": "any",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/forgeops-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/forgeops-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/forgeops-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Incidencias", "short_name": "Incidencias", "url": "/incidents" },
+    { "name": "Ordenes de trabajo", "short_name": "Ordenes", "url": "/work-orders" },
+    { "name": "Activos", "short_name": "Activos", "url": "/assets" }
+  ]
+}

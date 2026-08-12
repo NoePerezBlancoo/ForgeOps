@@ -5,6 +5,7 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly details?: unknown,
+    public readonly requestId?: string | null,
   ) {
     super(message);
   }
@@ -41,7 +42,9 @@ export async function apiRequest<T>(
     const message = Array.isArray(detail)
       ? detail.map((item) => item.msg).join(". ")
       : detail || "No se pudo completar la operacion";
-    throw new ApiError(message, response.status, details);
+    const requestId = response.headers.get("X-Request-ID");
+    const supportMessage = response.status >= 500 && requestId ? `${message} Ref. ${requestId}` : message;
+    throw new ApiError(supportMessage, response.status, details, requestId);
   }
 
   if (response.status === 204) return undefined as T;
