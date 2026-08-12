@@ -24,6 +24,12 @@ class KnowledgeChunk(UUIDPrimaryKeyMixin, TenantMixin, Base):
     __table_args__ = (
         UniqueConstraint("document_id", "chunk_index", name="uq_chunks_document_index"),
         Index("ix_chunks_company_asset", "company_id", "asset_id"),
+        Index(
+            "ix_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
     )
 
     document_id: Mapped[uuid.UUID] = mapped_column(

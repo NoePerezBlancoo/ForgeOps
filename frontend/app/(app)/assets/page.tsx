@@ -8,6 +8,7 @@ import { EmptyState, ErrorBanner, LoadingBlock } from "@/components/feedback";
 import { Modal } from "@/components/modal";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
+import { useWorkspace } from "@/components/workspace-provider";
 import { ApiError } from "@/lib/api";
 import type { Asset, AssetStatus, Criticality, Plant } from "@/lib/types";
 
@@ -43,6 +44,7 @@ const emptyForm: AssetForm = {
 
 export default function AssetsPage() {
   const { request, user } = useAuth();
+  const { scopedPath } = useWorkspace();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,7 +63,7 @@ export default function AssetsPage() {
     setError("");
     try {
       const [assetData, plantData] = await Promise.all([
-        request<Asset[]>("/assets"),
+        request<Asset[]>(scopedPath("/assets")),
         request<Plant[]>("/plants"),
       ]);
       setAssets(assetData);
@@ -71,7 +73,7 @@ export default function AssetsPage() {
     } finally {
       setLoading(false);
     }
-  }, [request]);
+  }, [request, scopedPath]);
 
   useEffect(() => {
     void loadData();

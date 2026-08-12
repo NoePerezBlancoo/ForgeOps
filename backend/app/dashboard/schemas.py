@@ -34,7 +34,22 @@ class UpcomingWorkOrder(BaseModel):
     scheduled_date: datetime | None
 
 
+class SetupItem(BaseModel):
+    key: str
+    label: str
+    complete: bool
+    href: str
+
+
+class PilotReadiness(BaseModel):
+    percent: int
+    completed: int
+    total: int
+    items: list[SetupItem]
+
+
 class DashboardRead(BaseModel):
+    readiness: PilotReadiness
     active_assets: int
     stopped_assets: int
     maintenance_assets: int

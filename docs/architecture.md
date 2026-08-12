@@ -1,6 +1,6 @@
 # Arquitectura de ForgeOps
 
-ForgeOps es un monolito modular con dos aplicaciones desplegables, almacenamiento documental privado y PostgreSQL con `pgvector`.
+ForgeOps V1.0 es un monolito modular con dos aplicaciones desplegables, almacenamiento documental privado y PostgreSQL con `pgvector`.
 
 ```text
 Browser -> Next.js -> FastAPI -> PostgreSQL + pgvector
@@ -10,24 +10,47 @@ Browser -> Next.js -> FastAPI -> PostgreSQL + pgvector
                        +-> OpenAI opcional
 ```
 
-## Decisiones principales
+## Modulos
 
-- Los identificadores publicos son UUID.
-- Toda entidad operativa incluye `company_id` y se consulta desde el contexto autenticado.
-- El access token JWT es corto; el refresh token rota y se almacena como hash.
-- Los permisos se resuelven por rol en una unica capa de dependencias.
-- Los modulos de dominio exponen modelos, esquemas, servicios y rutas pequenas.
-- Alembic es la unica via de evolucion del esquema.
-- La carga demo es idempotente y se apoya en claves unicas para impedir duplicados.
-- Los documentos nunca se publican directamente; cada descarga valida usuario y empresa.
-- Los fragmentos y consultas de IA conservan `company_id` para evitar recuperacion cruzada.
+```text
+auth        identidad, tokens y sesiones
+companies   configuracion empresarial
+plants      centros productivos
+users       equipo y permisos
+audit       trazabilidad administrativa
+assets      maestro de equipos
+incidents   averias y seguimiento
+work_orders ejecucion del mantenimiento
+maintenance planificacion preventiva
+inventory   repuestos y movimientos
+documents   archivos privados
+ai          ingesta, recuperacion y RAG
+dashboard   KPIs y onboarding
+```
 
-## Inteligencia documental V0.3
+## Decisiones
 
-La ingesta extrae texto de TXT, PDF y DOCX, lo normaliza y divide en fragmentos con solapamiento. Cada fragmento queda vinculado a empresa, documento y activo. La reindexacion sustituye los fragmentos anteriores dentro de una transaccion logica, evitando duplicados.
+- UUID para identificadores publicos.
+- `company_id` obligatorio en toda entidad empresarial.
+- Consultas acotadas desde el usuario autenticado, nunca desde datos enviados por el navegador.
+- Selector de planta como filtro opcional dentro de la empresa autorizada.
+- Access token corto y refresh token rotatorio almacenado como hash.
+- Permisos centralizados por rol y reglas adicionales en el dominio.
+- Alembic como unica via de evolucion del esquema.
+- Semilla idempotente apoyada en restricciones unicas.
+- Archivos fuera del directorio publico y descargas autenticadas.
+- Auditoria separada de los datos operativos y conservacion del actor cuando existe.
 
-El modo local realiza recuperacion lexica y genera respuestas extractivas citadas. El modo OpenAI calcula embeddings, usa distancia coseno sobre `pgvector` y genera la respuesta con instrucciones estrictas para limitarla a la evidencia recuperada. Si el proveedor externo falla, la consulta conserva un resultado extractivo local.
+## Limites de dominio
 
-Las preguntas y respuestas quedan registradas con usuario, empresa, activo, modo, proveedor, confianza, fuentes y duracion. La clave del proveedor solo se lee desde el entorno del backend.
+Los servicios validan relaciones cruzadas antes de escribir: una orden no puede apuntar a un activo de otra planta, un responsable debe pertenecer a la empresa y un documento solo se recupera dentro de su tenant. Desactivar usuarios revoca sesiones; eliminar el ultimo administrador o desactivar una planta con activos se rechaza.
 
-Consulta [document-intelligence.md](document-intelligence.md) para el flujo operativo y sus limites de confianza.
+## Inteligencia documental
+
+La ingesta extrae TXT, PDF y DOCX, normaliza el texto y crea fragmentos solapados. Cada fragmento conserva empresa, documento, activo y pagina. La reindexacion reemplaza los fragmentos anteriores y la restriccion `(document_id, chunk_index)` evita duplicados.
+
+El modo local utiliza recuperacion lexica y respuestas extractivas. El modo OpenAI calcula embeddings, consulta `pgvector` por distancia coseno y genera con evidencia limitada. Los umbrales absolutos y relativos evitan presentar los fragmentos menos malos como si fueran relevantes.
+
+## Despliegue
+
+Los tres servicios se ejecutan con Docker Compose y healthchecks. El backend migra y prepara datos al iniciar. Para un piloto, PostgreSQL y los volumentes deben respaldarse, los servicios deben quedar detras de TLS y solo el proxy debe estar expuesto. Consulta [pilot-deployment.md](pilot-deployment.md).

@@ -21,10 +21,13 @@ def index(
     search: str | None = Query(default=None, max_length=100),
     incident_status: IncidentStatus | None = Query(default=None, alias="status"),
     priority: Priority | None = None,
+    plant_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list:
-    return list_incidents(db, current_user.company_id, search, incident_status, priority)
+    return list_incidents(
+        db, current_user.company_id, search, incident_status, priority, plant_id
+    )
 
 
 @router.get("/{incident_id}", response_model=IncidentRead)

@@ -30,10 +30,11 @@ managers = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAINTENA
 @router.get("", response_model=list[PreventivePlanRead])
 def index(
     active: bool | None = Query(default=None),
+    plant_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return list_plans(db, current_user.company_id, active)
+    return list_plans(db, current_user.company_id, active, plant_id)
 
 
 @router.get("/{plan_id}", response_model=PreventivePlanRead)

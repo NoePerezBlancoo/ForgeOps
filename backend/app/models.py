@@ -1,5 +1,6 @@
 from app.ai.models import AIQueryLog, KnowledgeChunk
 from app.assets.models import Asset
+from app.audit.models import AuditEvent
 from app.auth.models import RefreshSession
 from app.companies.models import Company
 from app.documents.models import TechnicalDocument
@@ -13,6 +14,7 @@ from app.work_orders.models import WorkOrder
 __all__ = [
     "Asset",
     "AIQueryLog",
+    "AuditEvent",
     "Company",
     "Incident",
     "InventoryItem",

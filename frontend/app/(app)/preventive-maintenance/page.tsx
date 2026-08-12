@@ -8,6 +8,7 @@ import { EmptyState, ErrorBanner, LoadingBlock } from "@/components/feedback";
 import { Modal } from "@/components/modal";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
+import { useWorkspace } from "@/components/workspace-provider";
 import { ApiError } from "@/lib/api";
 import { formatDate, labelFor } from "@/lib/format";
 import type {
@@ -52,6 +53,7 @@ function localDateTime(value: string): string {
 
 export default function PreventiveMaintenancePage() {
   const { request, user } = useAuth();
+  const { scopedPath } = useWorkspace();
   const [plans, setPlans] = useState<PreventivePlan[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -73,9 +75,9 @@ export default function PreventiveMaintenancePage() {
     setError("");
     try {
       const [planData, assetData, userData] = await Promise.all([
-        request<PreventivePlan[]>("/preventive-maintenance"),
-        request<Asset[]>("/assets"),
-        request<UserOption[]>("/users"),
+        request<PreventivePlan[]>(scopedPath("/preventive-maintenance")),
+        request<Asset[]>(scopedPath("/assets")),
+        request<UserOption[]>("/users/options"),
       ]);
       setPlans(planData);
       setAssets(assetData);
@@ -89,7 +91,7 @@ export default function PreventiveMaintenancePage() {
     } finally {
       setLoading(false);
     }
-  }, [request]);
+  }, [request, scopedPath]);
 
   useEffect(() => {
     void loadData();

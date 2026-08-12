@@ -19,6 +19,7 @@ def list_documents(
     search: str | None = None,
     asset_id: uuid.UUID | None = None,
     document_type: DocumentType | None = None,
+    plant_id: uuid.UUID | None = None,
 ) -> list[TechnicalDocument]:
     query = (
         select(TechnicalDocument)
@@ -39,6 +40,8 @@ def list_documents(
         query = query.where(TechnicalDocument.asset_id == asset_id)
     if document_type:
         query = query.where(TechnicalDocument.type == document_type)
+    if plant_id:
+        query = query.where(TechnicalDocument.asset.has(Asset.plant_id == plant_id))
     return list(db.scalars(query).unique())
 
 

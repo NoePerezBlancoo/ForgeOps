@@ -16,6 +16,7 @@ import { useAuth } from "@/components/auth-provider";
 import { ErrorBanner, LoadingBlock } from "@/components/feedback";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
+import { useWorkspace } from "@/components/workspace-provider";
 import { ApiError } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type {
@@ -40,6 +41,7 @@ const suggestions = [
 
 export default function KnowledgePage() {
   const { request, download, user } = useAuth();
+  const { scopedPath } = useWorkspace();
   const [status, setStatus] = useState<KnowledgeStatus | null>(null);
   const [documents, setDocuments] = useState<TechnicalDocument[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -63,8 +65,8 @@ export default function KnowledgePage() {
     try {
       const [statusData, documentData, assetData, historyData] = await Promise.all([
         request<KnowledgeStatus>("/ai/status"),
-        request<TechnicalDocument[]>("/documents"),
-        request<Asset[]>("/assets"),
+        request<TechnicalDocument[]>(scopedPath("/documents")),
+        request<Asset[]>(scopedPath("/assets")),
         request<KnowledgeHistory[]>("/ai/history?limit=8"),
       ]);
       setStatus(statusData);
@@ -80,7 +82,7 @@ export default function KnowledgePage() {
     } finally {
       setLoading(false);
     }
-  }, [request]);
+  }, [request, scopedPath]);
 
   useEffect(() => {
     void loadData();

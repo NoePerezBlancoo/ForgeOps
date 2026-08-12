@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,6 +44,17 @@ class Settings(BaseSettings):
         if normalized not in {"local", "openai"}:
             raise ValueError("AI_PROVIDER debe ser local u openai")
         return normalized
+
+    @model_validator(mode="after")
+    def validate_production_security(self):
+        if self.app_env.lower() == "production":
+            if self.secret_key.startswith("development-"):
+                raise ValueError("SECRET_KEY debe cambiarse en produccion")
+            if not self.cookie_secure:
+                raise ValueError("COOKIE_SECURE debe estar activo en produccion")
+            if any("localhost" in origin for origin in self.allowed_origins):
+                raise ValueError("FRONTEND_URL no puede apuntar a localhost en produccion")
+        return self
 
     @property
     def allowed_origins(self) -> list[str]:
