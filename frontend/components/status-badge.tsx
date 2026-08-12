@@ -17,9 +17,13 @@ const tones: Record<string, string> = {
   MEDIUM: "badge-info",
   LOW: "badge-neutral",
   CANCELLED: "badge-neutral",
+  PENDING: "badge-warning",
+  INDEXING: "badge-info",
+  READY: "badge-success",
+  FAILED: "badge-danger",
+  UNSUPPORTED: "badge-neutral",
 };
 
 export function StatusBadge({ value }: { value: string }) {
   return <span className={`status-badge ${tones[value] ?? "badge-neutral"}`}>{labelFor(value)}</span>;
 }
-

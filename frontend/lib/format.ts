@@ -36,6 +36,11 @@ const labels: Record<string, string> = {
   PROCEDURE: "Procedimiento",
   SAFETY: "Seguridad",
   OTHER: "Otro",
+  PENDING: "Pendiente",
+  INDEXING: "Indexando",
+  READY: "Disponible",
+  FAILED: "Error",
+  UNSUPPORTED: "No compatible",
 };
 
 export function labelFor(value: string): string {

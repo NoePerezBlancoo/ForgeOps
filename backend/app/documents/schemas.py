@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.core.enums import DocumentType
+from app.core.enums import DocumentIndexStatus, DocumentType
 from app.core.schemas import AssetSummary, ORMModel, UserSummary
 
 
@@ -19,6 +19,12 @@ class TechnicalDocumentRead(ORMModel):
     file_size: int
     description: str | None
     uploaded_at: datetime
+    index_status: DocumentIndexStatus
+    indexed_at: datetime | None
+    index_error: str | None
+    chunk_count: int
+    embedded_chunk_count: int
+    embedding_model: str | None
     asset: AssetSummary
     uploader: UserSummary
 

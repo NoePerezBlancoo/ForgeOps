@@ -74,3 +74,11 @@ class DocumentType(StrEnum):
     PROCEDURE = "PROCEDURE"
     SAFETY = "SAFETY"
     OTHER = "OTHER"
+
+
+class DocumentIndexStatus(StrEnum):
+    PENDING = "PENDING"
+    INDEXING = "INDEXING"
+    READY = "READY"
+    FAILED = "FAILED"
+    UNSUPPORTED = "UNSUPPORTED"

@@ -26,6 +26,7 @@ export type WorkOrderType = "CORRECTIVE" | "PREVENTIVE" | "INSPECTION" | "IMPROV
 export type FrequencyType = "DAYS" | "WEEKS" | "MONTHS" | "YEARS";
 export type InventoryMovementType = "RECEIPT" | "CONSUMPTION" | "ADJUSTMENT";
 export type DocumentType = "MANUAL" | "ELECTRICAL_SCHEMATIC" | "PROCEDURE" | "SAFETY" | "OTHER";
+export type DocumentIndexStatus = "PENDING" | "INDEXING" | "READY" | "FAILED" | "UNSUPPORTED";
 
 export interface CompanySummary {
   id: string;
@@ -223,6 +224,65 @@ export interface TechnicalDocument {
   file_size: number;
   description: string | null;
   uploaded_at: string;
+  index_status: DocumentIndexStatus;
+  indexed_at: string | null;
+  index_error: string | null;
+  chunk_count: number;
+  embedded_chunk_count: number;
+  embedding_model: string | null;
   asset: Pick<Asset, "id" | "code" | "name">;
   uploader: Pick<User, "id" | "full_name" | "email">;
+}
+
+export interface KnowledgeStatus {
+  configured_provider: string;
+  effective_provider: "local" | "openai";
+  generation_available: boolean;
+  semantic_search_available: boolean;
+  chat_model: string | null;
+  embedding_model: string | null;
+  indexed_documents: number;
+  pending_documents: number;
+  failed_documents: number;
+  unsupported_documents: number;
+  chunks: number;
+  embedded_chunks: number;
+  configuration_warning: string | null;
+}
+
+export interface KnowledgeSource {
+  chunk_id: string;
+  document_id: string;
+  document_name: string;
+  original_name: string;
+  asset_id: string;
+  asset_code: string;
+  asset_name: string;
+  page_number: number | null;
+  excerpt: string;
+  score: number;
+}
+
+export interface KnowledgeAnswer {
+  query_id: string;
+  answer: string;
+  mode: "extractive" | "generative" | "insufficient";
+  provider: string;
+  model: string | null;
+  confidence: number;
+  duration_ms: number;
+  sources: KnowledgeSource[];
+}
+
+export interface KnowledgeHistory {
+  id: string;
+  question: string;
+  answer: string;
+  mode: string;
+  provider: string;
+  model: string | null;
+  confidence: number;
+  source_count: number;
+  duration_ms: number;
+  created_at: string;
 }

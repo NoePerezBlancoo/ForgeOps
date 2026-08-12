@@ -5,7 +5,7 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text,
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.core.enums import DocumentType
+from app.core.enums import DocumentIndexStatus, DocumentType
 from app.core.mixins import TenantMixin, UUIDPrimaryKeyMixin
 
 
@@ -31,6 +31,25 @@ class TechnicalDocument(UUIDPrimaryKeyMixin, TenantMixin, Base):
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    index_status: Mapped[DocumentIndexStatus] = mapped_column(
+        Enum(
+            DocumentIndexStatus,
+            name="document_index_status",
+            native_enum=False,
+            length=24,
+        ),
+        default=DocumentIndexStatus.PENDING,
+        nullable=False,
+    )
+    indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    index_error: Mapped[str | None] = mapped_column(String(500))
+    content_hash: Mapped[str | None] = mapped_column(String(64))
+    chunk_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    embedded_chunk_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    embedding_model: Mapped[str | None] = mapped_column(String(80))
 
     asset: Mapped["Asset"] = relationship()  # noqa: F821
     uploader: Mapped["User"] = relationship()  # noqa: F821
+    knowledge_chunks: Mapped[list["KnowledgeChunk"]] = relationship(  # noqa: F821
+        back_populates="document", cascade="all, delete-orphan"
+    )

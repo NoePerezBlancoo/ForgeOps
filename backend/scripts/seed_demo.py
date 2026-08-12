@@ -2,6 +2,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
 
+from app.ai.service import index_documents
 from app.assets.models import Asset
 from app.auth.security import hash_password
 from app.companies.models import Company
@@ -718,7 +719,14 @@ def seed() -> None:
         get_or_create_inventory(db, company, users)
         get_or_create_documents(db, company, assets, users)
         db.commit()
-        print("Demo ForgeOps preparada sin duplicados.")
+        indexed = index_documents(
+            db,
+            company.id,
+            LocalDocumentStorage(),
+            force=False,
+            provider=None,
+        )
+        print(f"Demo ForgeOps preparada sin duplicados. Documentos indexados: {indexed.indexed}.")
 
 
 if __name__ == "__main__":
