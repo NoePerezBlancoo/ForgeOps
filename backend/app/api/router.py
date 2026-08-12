@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.ai.routes import router as ai_router
 from app.assets.routes import router as assets_router
 from app.auth.routes import router as auth_router
 from app.companies.routes import router as companies_router
@@ -23,4 +24,5 @@ api_router.include_router(work_orders_router)
 api_router.include_router(maintenance_router)
 api_router.include_router(inventory_router)
 api_router.include_router(documents_router)
+api_router.include_router(ai_router)
 api_router.include_router(dashboard_router)

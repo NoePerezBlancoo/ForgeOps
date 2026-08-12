@@ -2,7 +2,7 @@ name: forgeops
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-forgeops}
       POSTGRES_USER: ${POSTGRES_USER:-forgeops}
@@ -31,6 +31,13 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-/app/uploads}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-15728640}
+      AI_PROVIDER: ${AI_PROVIDER:-local}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-5}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-30}
+      RAG_MIN_SEMANTIC_SCORE: ${RAG_MIN_SEMANTIC_SCORE:-0.25}
+      RAG_RELATIVE_SCORE_FLOOR: ${RAG_RELATIVE_SCORE_FLOOR:-0.72}
     ports:
       - "8000:8000"
     volumes:

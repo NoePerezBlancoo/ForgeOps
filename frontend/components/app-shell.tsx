@@ -2,6 +2,7 @@
 
 import {
   Boxes,
+  BrainCircuit,
   Building2,
   ChevronDown,
   ClipboardList,
@@ -37,6 +38,10 @@ const planningNavigation = [
   { href: "/documents", label: "Documentos", icon: FileText },
 ];
 
+const intelligenceNavigation = [
+  { href: "/knowledge", label: "Asistente documental", icon: BrainCircuit },
+];
+
 const administrationNavigation = [
   { label: "Empresa", icon: Building2 },
   { label: "Usuarios", icon: Users },
@@ -51,6 +56,7 @@ const pageNames: Record<string, string> = {
   "/preventive-maintenance": "Mantenimiento preventivo",
   "/inventory": "Inventario de repuestos",
   "/documents": "Documentacion tecnica",
+  "/knowledge": "Inteligencia documental",
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -83,7 +89,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-5">
+      <nav className="sidebar-nav flex-1 overflow-y-auto px-3 py-4">
         <p className="nav-heading">Operacion</p>
         <div className="space-y-1">
           {primaryNavigation.map((item) => {
@@ -104,7 +110,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </div>
 
-        <p className="nav-heading mt-7">Planificacion</p>
+        <p className="nav-heading mt-5">Planificacion</p>
         <div className="space-y-1">
           {planningNavigation.map((item) => {
             const Icon = item.icon;
@@ -124,7 +130,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </div>
 
-        <p className="nav-heading mt-7">Administracion</p>
+        <p className="nav-heading mt-5">Inteligencia</p>
+        <div className="space-y-1">
+          {intelligenceNavigation.map((item) => {
+            const Icon = item.icon;
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={`nav-item ${active ? "nav-item-active" : ""}`}
+                title={item.label}
+              >
+                <Icon size={19} />
+                <span className="md:hidden lg:inline">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+
+        <p className="nav-heading mt-5">Administracion</p>
         <div className="space-y-1">
           {administrationNavigation.map((item) => {
             const Icon = item.icon;

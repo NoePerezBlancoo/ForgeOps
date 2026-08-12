@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorBanner, LoadingBlock } from "@/components/feedback";
 import { Modal } from "@/components/modal";
 import { PageHeader } from "@/components/page-header";
+import { StatusBadge } from "@/components/status-badge";
 import { ApiError } from "@/lib/api";
 import { formatDate, labelFor } from "@/lib/format";
 import type { Asset, DocumentType, TechnicalDocument } from "@/lib/types";
@@ -84,9 +85,17 @@ export default function DocumentsPage() {
     body.set("description", description);
     body.set("file", file);
     try {
-      await request("/documents", { method: "POST", body });
+      const created = await request<TechnicalDocument>("/documents", { method: "POST", body });
+      const indexed = await request<{ status: string; message: string }>(
+        `/ai/documents/${created.id}/index`,
+        { method: "POST" },
+      );
       setModalOpen(false);
-      setNotice("Documento tecnico almacenado");
+      setNotice(
+        indexed.status === "READY"
+          ? "Documento almacenado e indexado"
+          : `Documento almacenado: ${indexed.message}`,
+      );
       await loadData();
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "No se pudo subir el documento");
@@ -139,7 +148,7 @@ export default function DocumentsPage() {
       {loading ? <LoadingBlock /> : <section className="panel overflow-hidden">
         {filteredDocuments.length === 0 ? <EmptyState title="No hay documentos" detail="Sube documentacion tecnica vinculada a un activo." /> : <div className="table-wrap"><table className="data-table document-table"><thead><tr><th>Documento</th><th>Activo</th><th>Tipo</th><th>Archivo</th><th>Subido por</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody>
           {filteredDocuments.map((document) => <tr key={document.id}>
-            <td><div className="flex min-w-0 items-center gap-3"><div className="grid size-9 shrink-0 place-items-center rounded-md bg-cyan-50 text-cyan-800"><FileText size={17} /></div><div className="min-w-0"><p className="font-bold text-[var(--ink)]">{document.name}</p><p className="mt-1 max-w-full truncate text-[11px] text-[var(--muted)]">{document.description ?? "Sin descripcion"}</p></div></div></td>
+            <td><div className="flex min-w-0 items-center gap-3"><div className="grid size-9 shrink-0 place-items-center rounded-md bg-cyan-50 text-cyan-800"><FileText size={17} /></div><div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate font-bold text-[var(--ink)]">{document.name}</p><StatusBadge value={document.index_status} /></div><p className="mt-1 max-w-full truncate text-[11px] text-[var(--muted)]">{document.description ?? "Sin descripcion"}</p></div></div></td>
             <td><p className="truncate font-semibold text-[var(--ink)]">{document.asset.code}</p><p className="mt-1 truncate text-[11px] text-[var(--muted)]">{document.asset.name}</p></td>
             <td>{labelFor(document.type)}</td>
             <td><p className="max-w-full truncate">{document.original_name}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{formatFileSize(document.file_size)}</p></td>

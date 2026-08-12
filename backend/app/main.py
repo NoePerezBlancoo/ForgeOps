@@ -16,8 +16,8 @@ logger = logging.getLogger("forgeops")
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.2.0",
-    description="API multiempresa para gestion de mantenimiento industrial.",
+    version="0.3.0",
+    description="API multiempresa para mantenimiento e inteligencia documental industrial.",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url=f"{settings.api_prefix}/openapi.json",
@@ -58,7 +58,7 @@ async def request_context(request: Request, call_next):
 
 @app.get("/health", tags=["Sistema"])
 def health() -> dict[str, str]:
-    return {"status": "ok", "version": "0.2.0"}
+    return {"status": "ok", "version": "0.3.0"}
 
 
 @app.get("/ready", tags=["Sistema"])
