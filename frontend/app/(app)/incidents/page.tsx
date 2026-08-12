@@ -1,13 +1,14 @@
 "use client";
 
 import { Clock3, Plus, Search, Settings2 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorBanner, LoadingBlock } from "@/components/feedback";
 import { Modal } from "@/components/modal";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
+import { useWorkspace } from "@/components/workspace-provider";
 import { ApiError } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { Asset, Incident, IncidentStatus, Priority, UserOption } from "@/lib/types";
@@ -34,6 +35,7 @@ const emptyCreate: CreateForm = { asset_id: "", assigned_to: "", title: "", desc
 
 export default function IncidentsPage() {
   const { request, user } = useAuth();
+  const { scopedPath } = useWorkspace();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -47,6 +49,7 @@ export default function IncidentsPage() {
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate);
   const [manageForm, setManageForm] = useState<ManageForm | null>(null);
   const [saving, setSaving] = useState(false);
+  const deepLinkHandled = useRef(false);
 
   const canManage = user && user.role !== "VIEWER";
 
@@ -55,9 +58,9 @@ export default function IncidentsPage() {
     setError("");
     try {
       const [incidentData, assetData, userData] = await Promise.all([
-        request<Incident[]>("/incidents"),
-        request<Asset[]>("/assets"),
-        request<UserOption[]>("/users"),
+        request<Incident[]>(scopedPath("/incidents")),
+        request<Asset[]>(scopedPath("/assets")),
+        request<UserOption[]>("/users/options"),
       ]);
       setIncidents(incidentData);
       setAssets(assetData);
@@ -67,9 +70,18 @@ export default function IncidentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [request]);
+  }, [request, scopedPath]);
 
   useEffect(() => { void loadData(); }, [loadData]);
+
+  useEffect(() => {
+    if (loading || !canManage || deepLinkHandled.current || assets.length === 0) return;
+    if (new URLSearchParams(window.location.search).get("new") !== "1") return;
+    deepLinkHandled.current = true;
+    setCreateForm({ ...emptyCreate, asset_id: assets[0].id });
+    setCreateOpen(true);
+    window.history.replaceState({}, "", "/incidents");
+  }, [assets, canManage, loading]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();

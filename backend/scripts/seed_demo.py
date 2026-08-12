@@ -33,6 +33,10 @@ from app.work_orders.models import WorkOrder
 def get_or_create_company(db) -> Company:
     company = db.scalar(select(Company).where(Company.tax_id == "B32456789"))
     if company:
+        company.industry = "Fabricacion metalmecanica"
+        company.timezone = "Europe/Madrid"
+        company.locale = "es-ES"
+        company.work_order_prefix = "OT"
         return company
     company = Company(
         name="MetalWorks Demo S.L.",
@@ -40,6 +44,10 @@ def get_or_create_company(db) -> Company:
         address="Parque Tecnoloxico de Galicia, Ourense",
         phone="+34 988 555 014",
         email="mantenimiento@metalworks-demo.local",
+        industry="Fabricacion metalmecanica",
+        timezone="Europe/Madrid",
+        locale="es-ES",
+        work_order_prefix="OT",
         active=True,
     )
     db.add(company)
@@ -66,13 +74,23 @@ def get_or_create_plant(db, company: Company) -> Plant:
 
 def get_or_create_users(db, company: Company) -> dict[str, User]:
     definitions = [
-        ("admin", "Noe Perez", "admin@metalworks-demo.local", UserRole.ADMIN, "Admin123!"),
+        (
+            "admin",
+            "Noe Perez",
+            "admin@metalworks-demo.local",
+            UserRole.ADMIN,
+            "Admin123!",
+            "Responsable IT y operaciones",
+            "+34 600 100 101",
+        ),
         (
             "manager",
             "Laura Mendez",
             "laura.mendez@metalworks-demo.local",
             UserRole.MAINTENANCE_MANAGER,
             "Manager123!",
+            "Responsable de mantenimiento",
+            "+34 600 100 102",
         ),
         (
             "tech1",
@@ -80,6 +98,8 @@ def get_or_create_users(db, company: Company) -> dict[str, User]:
             "david.rodriguez@metalworks-demo.local",
             UserRole.TECHNICIAN,
             "Technician123!",
+            "Tecnico electromecanico",
+            "+34 600 100 103",
         ),
         (
             "tech2",
@@ -87,6 +107,8 @@ def get_or_create_users(db, company: Company) -> dict[str, User]:
             "sara.alonso@metalworks-demo.local",
             UserRole.TECHNICIAN,
             "Technician123!",
+            "Tecnica de automatizacion",
+            "+34 600 100 104",
         ),
         (
             "viewer",
@@ -94,22 +116,30 @@ def get_or_create_users(db, company: Company) -> dict[str, User]:
             "carlos.silva@metalworks-demo.local",
             UserRole.VIEWER,
             "Viewer123!",
+            "Responsable de produccion",
+            "+34 600 100 105",
         ),
     ]
     result: dict[str, User] = {}
-    for key, name, email, role, password in definitions:
+    for key, name, email, role, password, job_title, phone in definitions:
         user = db.scalar(select(User).where(User.email == email))
         if not user:
             user = User(
                 company_id=company.id,
                 full_name=name,
                 email=email,
+                job_title=job_title,
+                phone=phone,
                 password_hash=hash_password(password),
+                password_changed_at=datetime.now(UTC),
                 role=role,
                 active=True,
             )
             db.add(user)
             db.flush()
+        else:
+            user.job_title = job_title
+            user.phone = phone
         result[key] = user
     return result
 

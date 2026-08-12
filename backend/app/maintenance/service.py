@@ -39,11 +39,16 @@ def _validate_assignee(db: Session, company_id: uuid.UUID, user_id: uuid.UUID | 
 
 
 def list_plans(
-    db: Session, company_id: uuid.UUID, active: bool | None = None
+    db: Session,
+    company_id: uuid.UUID,
+    active: bool | None = None,
+    plant_id: uuid.UUID | None = None,
 ) -> list[PreventivePlan]:
     query = _base_query().where(PreventivePlan.company_id == company_id)
     if active is not None:
         query = query.where(PreventivePlan.active.is_(active))
+    if plant_id:
+        query = query.where(PreventivePlan.asset.has(Asset.plant_id == plant_id))
     return list(db.scalars(query.order_by(PreventivePlan.next_execution, PreventivePlan.name)))
 
 
@@ -125,7 +130,10 @@ def generate_work_order(db: Session, current_user: User, plan_id: uuid.UUID) -> 
         preventive_plan_id=plan.id,
         assigned_to=plan.assigned_to,
         created_by=current_user.id,
-        number=f"OT-PREV-{now:%y%m}-{uuid.uuid4().hex[:6].upper()}",
+        number=(
+            f"{current_user.company.work_order_prefix}-PREV-"
+            f"{now:%y%m}-{uuid.uuid4().hex[:6].upper()}"
+        ),
         title=plan.name,
         description=plan.description,
         type=WorkOrderType.PREVENTIVE,

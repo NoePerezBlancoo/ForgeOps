@@ -27,10 +27,11 @@ def index(
     search: str | None = Query(default=None, max_length=100),
     order_status: WorkOrderStatus | None = Query(default=None, alias="status"),
     priority: Priority | None = None,
+    plant_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list:
-    return list_work_orders(db, current_user, search, order_status, priority)
+    return list_work_orders(db, current_user, search, order_status, priority, plant_id)
 
 
 @router.get("/{order_id}", response_model=WorkOrderRead)

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
+import { WorkspaceProvider } from "@/components/workspace-provider";
 
 export function ProtectedShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -25,6 +26,9 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) return null;
-  return <AppShell>{children}</AppShell>;
+  return (
+    <WorkspaceProvider>
+      <AppShell>{children}</AppShell>
+    </WorkspaceProvider>
+  );
 }
-

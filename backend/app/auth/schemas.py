@@ -1,6 +1,9 @@
+from datetime import datetime
+from uuid import UUID
+
 from pydantic import BaseModel, Field, field_validator
 
-from app.users.schemas import UserRead
+from app.users.schemas import UserPasswordChange, UserRead
 
 
 class LoginRequest(BaseModel):
@@ -25,3 +28,24 @@ class TokenResponse(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str | None = None
+
+
+class SessionRead(BaseModel):
+    id: UUID
+    created_at: datetime
+    expires_at: datetime
+    current: bool = False
+
+
+class SessionsRevokedRead(BaseModel):
+    revoked: int
+
+
+__all__ = [
+    "LoginRequest",
+    "RefreshRequest",
+    "SessionRead",
+    "SessionsRevokedRead",
+    "TokenResponse",
+    "UserPasswordChange",
+]

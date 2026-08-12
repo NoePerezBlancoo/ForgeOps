@@ -27,10 +27,13 @@ def index(
     search: str | None = Query(default=None, max_length=100),
     asset_id: uuid.UUID | None = None,
     document_type: DocumentType | None = Query(default=None, alias="type"),
+    plant_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return list_documents(db, current_user.company_id, search, asset_id, document_type)
+    return list_documents(
+        db, current_user.company_id, search, asset_id, document_type, plant_id
+    )
 
 
 @router.post("", response_model=TechnicalDocumentRead, status_code=status.HTTP_201_CREATED)

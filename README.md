@@ -1,26 +1,28 @@
 # ForgeOps
 
-ForgeOps es una plataforma SaaS B2B para digitalizar el mantenimiento de pequenas y medianas empresas industriales. Centraliza activos, incidencias, ordenes de trabajo, preventivos, repuestos, documentacion tecnica y conocimiento operativo con aislamiento multiempresa.
+ForgeOps es una plataforma SaaS B2B para digitalizar el mantenimiento de pequenas y medianas empresas industriales. Sustituye hojas de calculo, papel y conversaciones dispersas por una operacion trazable sobre plantas, activos, incidencias, ordenes, preventivos, repuestos y documentacion tecnica.
 
-La V0.3 es una aplicacion funcional preparada para demostraciones y evolucion hacia un piloto. Incluye API REST, autenticacion segura, permisos por rol, migraciones, datos demo idempotentes, almacenamiento documental privado, asistente con citas verificables, interfaz responsive y pruebas automatizadas.
+La V1.0 esta preparada para un piloto comercial controlado. Incluye administracion empresarial, permisos, aislamiento multiempresa, auditoria, seguridad de sesiones, onboarding operativo, inteligencia documental con fuentes y despliegue reproducible con Docker.
 
-## Funcionalidad
+## Capacidades V1.0
 
-- Login con access token JWT y refresh token rotatorio en cookie `HttpOnly`.
-- Aislamiento logico por empresa mediante `company_id`.
+- Autenticacion JWT con access token corto y refresh token rotatorio en cookie `HttpOnly`.
 - Roles `SUPER_ADMIN`, `ADMIN`, `MAINTENANCE_MANAGER`, `TECHNICIAN` y `VIEWER`.
-- Empresas, plantas, usuarios y activos industriales.
-- Incidencias con prioridad, responsable, parada, causa raiz y resolucion.
+- Aislamiento logico por empresa en todos los datos operativos y documentales.
+- Perfil de empresa, zona horaria, formato regional y prefijo configurable de ordenes.
+- Plantas administrables y selector global que filtra la operacion real.
+- Usuarios, puestos, roles, activacion, restablecimiento de contrasena y cierre de sesiones.
+- Registro de auditoria para accesos y cambios administrativos.
+- Indicador de preparacion para piloto y accesos directos a pasos pendientes.
+- Activos industriales con criticidad, ubicacion, fabricante y estado.
+- Incidencias con prioridad, responsable, tiempos de parada, causa y resolucion.
 - Ordenes correctivas, preventivas, de inspeccion y mejora.
-- Planes preventivos recurrentes con generacion controlada de ordenes.
-- Inventario de repuestos con stock minimo y movimientos inmutables.
-- Documentos privados vinculados a activos, versionados e indexables.
-- Extraccion real de TXT, PDF y DOCX con fragmentacion controlada.
-- Recuperacion local operativa sin servicios externos.
-- Busqueda vectorial con `pgvector` y respuestas OpenAI opcionales.
-- Asistente documental con filtro por activo, citas, descarga de fuentes e historial.
-- Dashboard con disponibilidad, carga, paradas, preventivos y alertas de stock.
-- Swagger/OpenAPI, Alembic, semilla demo y GitHub Actions.
+- Preventivos recurrentes con generacion idempotente de ordenes.
+- Inventario con stock minimo y movimientos inmutables.
+- Documentos privados vinculados a activos con extraccion TXT, PDF y DOCX.
+- Asistente documental local o RAG OpenAI opcional, siempre con fuentes descargables.
+- Dashboard operativo con disponibilidad, carga, paradas y alertas.
+- API OpenAPI, migraciones Alembic, datos demo idempotentes y CI.
 
 ## Stack
 
@@ -32,9 +34,9 @@ IA opcional OpenAI Responses API, text-embedding-3-small
 Ejecucion   Docker Compose
 ```
 
-El backend es un monolito modular. Cada dominio mantiene sus modelos, esquemas, servicios y rutas. Consulta [docs/architecture.md](docs/architecture.md) y [docs/document-intelligence.md](docs/document-intelligence.md) para conocer las decisiones principales.
+ForgeOps mantiene un monolito modular deliberado. Consulta [Arquitectura](docs/architecture.md), [Inteligencia documental](docs/document-intelligence.md) y [Despliegue de piloto](docs/pilot-deployment.md).
 
-## Puesta en marcha
+## Inicio rapido
 
 Requisitos: Docker Desktop y los puertos `3000`, `8000` y `5432` disponibles.
 
@@ -43,16 +45,16 @@ Copy-Item .env.example .env
 docker compose up -d --build
 ```
 
-Servicios:
-
 - Aplicacion: http://localhost:3000
-- API: http://localhost:8000
 - Swagger: http://localhost:8000/docs
-- OpenAPI: http://localhost:8000/api/v1/openapi.json
+- Healthcheck: http://localhost:8000/health
+- Readiness: http://localhost:8000/ready
 
-El backend aplica las migraciones y prepara los datos demo automaticamente. La semilla puede ejecutarse repetidamente sin duplicar registros ni fragmentos documentales.
+El backend aplica migraciones y carga datos demo automaticamente. La semilla se puede ejecutar repetidamente sin duplicar registros ni fragmentos documentales.
 
-## Credenciales demo
+En produccion usa `SEED_DEMO_DATA=false` y crea el primer acceso con `python -m scripts.bootstrap_admin`, tal como se documenta en la guia de despliegue.
+
+## Acceso demo
 
 ```text
 Email:    admin@metalworks-demo.local
@@ -60,13 +62,11 @@ Password: Admin123!
 Rol:      ADMIN
 ```
 
-Estas credenciales solo deben utilizarse para desarrollo y demostracion.
+Estas credenciales solo son validas para desarrollo y demostracion.
 
 ## Inteligencia documental
 
-La configuracion predeterminada es `AI_PROVIDER=local`. Indexa los documentos y responde de forma extractiva con referencias, sin enviar informacion a terceros ni requerir una clave.
-
-Para habilitar embeddings y respuestas generativas, configura estas variables solo en el servidor:
+`AI_PROVIDER=local` es el modo predeterminado. No necesita claves externas y responde de forma extractiva con citas. Para activar embeddings y generacion:
 
 ```dotenv
 AI_PROVIDER=openai
@@ -75,12 +75,13 @@ OPENAI_CHAT_MODEL=gpt-5
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 ```
 
-Tras cambiar de proveedor, reconstruye el backend y usa `Reindexar` en la base documental para generar los embeddings de los documentos existentes.
+La clave permanece en el backend. Tras cambiar de proveedor se deben reindexar los documentos desde el panel de inteligencia.
 
-## Comandos habituales
+## Comandos
 
 ```powershell
 docker compose up -d --build
+docker compose ps
 docker compose logs -f
 docker compose exec backend alembic upgrade head
 docker compose exec backend python -m scripts.seed_demo
@@ -91,61 +92,57 @@ docker compose exec frontend npm run typecheck
 docker compose down
 ```
 
-Para reiniciar tambien los datos locales:
+Reinicio completo de datos locales:
 
 ```powershell
 docker compose down -v
 ```
 
-## API V0.3
+## API principal
 
 ```text
-POST  /api/v1/auth/login
-POST  /api/v1/auth/refresh
-POST  /api/v1/auth/logout
-GET   /api/v1/auth/me
-
-GET   /api/v1/assets
-GET   /api/v1/incidents
-GET   /api/v1/work-orders
-GET   /api/v1/dashboard
-
-GET   /api/v1/preventive-maintenance
-POST  /api/v1/preventive-maintenance
-PATCH /api/v1/preventive-maintenance/{id}
-POST  /api/v1/preventive-maintenance/{id}/generate-work-order
-POST  /api/v1/preventive-maintenance/actions/generate-due
-
-GET   /api/v1/inventory
-POST  /api/v1/inventory
-PATCH /api/v1/inventory/{id}
-GET   /api/v1/inventory/{id}/movements
-POST  /api/v1/inventory/{id}/movements
-
-GET    /api/v1/documents
-POST   /api/v1/documents
-GET    /api/v1/documents/{id}/download
-PATCH  /api/v1/documents/{id}
-DELETE /api/v1/documents/{id}
-
-GET  /api/v1/ai/status
-GET  /api/v1/ai/history
-POST /api/v1/ai/query
-POST /api/v1/ai/documents/index
-POST /api/v1/ai/documents/{id}/index
+/api/v1/auth                    autenticacion, contrasena y sesiones
+/api/v1/companies               empresa actual y configuracion
+/api/v1/plants                  plantas y estado
+/api/v1/users                   equipo, roles y credenciales
+/api/v1/audit-events            trazabilidad administrativa
+/api/v1/assets                  activos industriales
+/api/v1/incidents               incidencias
+/api/v1/work-orders             ordenes de trabajo
+/api/v1/preventive-maintenance  planes preventivos
+/api/v1/inventory               repuestos y movimientos
+/api/v1/documents               archivos tecnicos privados
+/api/v1/ai                      indexacion y consultas documentales
+/api/v1/dashboard               KPIs y preparacion del piloto
 ```
+
+## Seguridad
+
+- Hash Argon2 para contrasenas y politica minima de complejidad.
+- Refresh tokens almacenados como hash y revocables.
+- Sesiones cerradas al cambiar contrasena o desactivar un usuario.
+- Proteccion del ultimo administrador activo.
+- Descargas autenticadas y almacenamiento fuera del directorio publico.
+- Cabeceras defensivas, CORS explicito y validacion estricta en produccion.
+- Claves y secretos excluidos del repositorio.
+
+`APP_ENV=production` exige una clave distinta de la predeterminada, cookies seguras y un `FRONTEND_URL` no local. Consulta la guia de despliegue antes de exponer un piloto.
 
 ## Calidad
 
-La suite cubre autenticacion, permisos, aislamiento entre empresas, activos, incidencias, ordenes, preventivos sin duplicados, stock no negativo, privacidad documental, extraccion, fragmentacion, indexacion idempotente y respuestas con fuentes. El workflow ejecuta lint, pruebas, typecheck y build en cada `push` y `pull request`.
+La suite cubre autenticacion, permisos, multiempresa, operaciones de mantenimiento, inventario, documentos, RAG, administracion, ultimo administrador, revocacion de sesiones, auditoria, filtros de planta, extraccion e idempotencia. GitHub Actions ejecuta Ruff, Pytest, ESLint, TypeScript y la build de Next.js en cada cambio.
+
+## Alcance del piloto
+
+V1.0 esta preparada para una empresa piloto con despliegue gestionado. Un SaaS publico requerira despues aprovisionamiento automatizado de clientes, facturacion, almacenamiento cloud, correo transaccional, monitorizacion centralizada y conectores IT/OT especificos.
 
 ## Hoja de ruta
 
-- **V0.1:** activos, incidencias, ordenes de trabajo y dashboard. Completada.
-- **V0.2:** preventivos, inventario, movimientos y documentos tecnicos. Completada.
-- **V0.3:** ingesta documental, embeddings y RAG con fuentes verificables. Completada.
-- **V0.4:** adaptadores OPC UA, MQTT, Modbus TCP, ERP y bases externas.
-- **V1.0:** auditoria avanzada, observabilidad, backups, almacenamiento cloud y piloto real.
+- **V0.1:** activos, incidencias, ordenes y dashboard. Completada.
+- **V0.2:** preventivos, inventario y documentos. Completada.
+- **V0.3:** ingesta documental y RAG verificable. Completada.
+- **V1.0:** administracion, seguridad, auditoria, contexto de planta y piloto comercial. Completada.
+- **Siguiente:** OPC UA, MQTT, ERP, observabilidad cloud y aprovisionamiento SaaS.
 
 ## Licencia
 

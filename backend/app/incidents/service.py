@@ -41,6 +41,7 @@ def list_incidents(
     search: str | None = None,
     incident_status: IncidentStatus | None = None,
     priority: Priority | None = None,
+    plant_id: uuid.UUID | None = None,
 ) -> list[Incident]:
     query = (
         _base_query().where(Incident.company_id == company_id).order_by(Incident.reported_at.desc())
@@ -56,6 +57,8 @@ def list_incidents(
         query = query.where(Incident.status == incident_status)
     if priority:
         query = query.where(Incident.priority == priority)
+    if plant_id:
+        query = query.where(Incident.plant_id == plant_id)
     return list(db.scalars(query))
 
 

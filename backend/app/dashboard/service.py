@@ -5,26 +5,49 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.assets.models import Asset
+from app.companies.models import Company
 from app.core.enums import AssetStatus, IncidentStatus, Priority, WorkOrderStatus
-from app.dashboard.schemas import ChartItem, DashboardRead, RecentIncident, UpcomingWorkOrder
+from app.dashboard.schemas import (
+    ChartItem,
+    DashboardRead,
+    PilotReadiness,
+    RecentIncident,
+    SetupItem,
+    UpcomingWorkOrder,
+)
+from app.documents.models import TechnicalDocument
 from app.incidents.models import Incident
 from app.inventory.models import InventoryItem
 from app.maintenance.models import PreventivePlan
+from app.plants.models import Plant
+from app.users.models import User
 from app.work_orders.models import WorkOrder
 
 
-def dashboard_data(db: Session, company_id: uuid.UUID) -> DashboardRead:
+def dashboard_data(
+    db: Session, company_id: uuid.UUID, plant_id: uuid.UUID | None = None
+) -> DashboardRead:
+    asset_scope = [Asset.company_id == company_id]
+    incident_scope = [Incident.company_id == company_id]
+    order_scope = [WorkOrder.company_id == company_id]
+    preventive_scope = [PreventivePlan.company_id == company_id]
+    if plant_id:
+        asset_scope.append(Asset.plant_id == plant_id)
+        incident_scope.append(Incident.plant_id == plant_id)
+        order_scope.append(WorkOrder.plant_id == plant_id)
+        preventive_scope.append(PreventivePlan.asset.has(Asset.plant_id == plant_id))
+    readiness = _pilot_readiness(db, company_id)
     asset_counts = dict(
         db.execute(
             select(Asset.status, func.count(Asset.id))
-            .where(Asset.company_id == company_id)
+            .where(*asset_scope)
             .group_by(Asset.status)
         ).all()
     )
     incident_counts = dict(
         db.execute(
             select(Incident.status, func.count(Incident.id))
-            .where(Incident.company_id == company_id)
+            .where(*incident_scope)
             .group_by(Incident.status)
         ).all()
     )
@@ -32,7 +55,7 @@ def dashboard_data(db: Session, company_id: uuid.UUID) -> DashboardRead:
         db.execute(
             select(Incident.priority, func.count(Incident.id))
             .where(
-                Incident.company_id == company_id,
+                *incident_scope,
                 Incident.status.notin_([IncidentStatus.RESOLVED, IncidentStatus.CLOSED]),
             )
             .group_by(Incident.priority)
@@ -41,19 +64,19 @@ def dashboard_data(db: Session, company_id: uuid.UUID) -> DashboardRead:
     order_counts = dict(
         db.execute(
             select(WorkOrder.status, func.count(WorkOrder.id))
-            .where(WorkOrder.company_id == company_id)
+            .where(*order_scope)
             .group_by(WorkOrder.status)
         ).all()
     )
     downtime_minutes = db.scalar(
         select(func.coalesce(func.sum(Incident.downtime_minutes), 0)).where(
-            Incident.company_id == company_id,
+            *incident_scope,
             Incident.reported_at >= datetime.now(UTC) - timedelta(days=30),
         )
     )
     upcoming_preventive_count = db.scalar(
         select(func.count(PreventivePlan.id)).where(
-            PreventivePlan.company_id == company_id,
+            *preventive_scope,
             PreventivePlan.active.is_(True),
             PreventivePlan.next_execution <= datetime.now(UTC) + timedelta(days=30),
         )
@@ -68,7 +91,7 @@ def dashboard_data(db: Session, company_id: uuid.UUID) -> DashboardRead:
     recent_rows = db.execute(
         select(Incident, Asset.code)
         .join(Asset, Asset.id == Incident.asset_id)
-        .where(Incident.company_id == company_id)
+        .where(*incident_scope)
         .order_by(Incident.reported_at.desc())
         .limit(5)
     ).all()
@@ -76,7 +99,7 @@ def dashboard_data(db: Session, company_id: uuid.UUID) -> DashboardRead:
         select(WorkOrder, Asset.code)
         .join(Asset, Asset.id == WorkOrder.asset_id)
         .where(
-            WorkOrder.company_id == company_id,
+            *order_scope,
             WorkOrder.status.notin_([WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED]),
         )
         .order_by(WorkOrder.scheduled_date.asc().nullslast(), WorkOrder.created_at.desc())
@@ -96,6 +119,7 @@ def dashboard_data(db: Session, company_id: uuid.UUID) -> DashboardRead:
         order_counts.get(value, 0) for value in [WorkOrderStatus.OPEN, WorkOrderStatus.ASSIGNED]
     )
     return DashboardRead(
+        readiness=readiness,
         active_assets=asset_counts.get(AssetStatus.ACTIVE, 0),
         stopped_assets=asset_counts.get(AssetStatus.STOPPED, 0),
         maintenance_assets=asset_counts.get(AssetStatus.MAINTENANCE, 0),
@@ -138,4 +162,90 @@ def dashboard_data(db: Session, company_id: uuid.UUID) -> DashboardRead:
             )
             for order, asset_code in upcoming_rows
         ],
+    )
+
+
+def _pilot_readiness(db: Session, company_id: uuid.UUID) -> PilotReadiness:
+    company = db.get(Company, company_id)
+    company_complete = bool(
+        company
+        and company.name
+        and company.tax_id
+        and company.address
+        and company.email
+        and company.industry
+    )
+    counts = {
+        "plants": db.scalar(
+            select(func.count(Plant.id)).where(
+                Plant.company_id == company_id, Plant.active.is_(True)
+            )
+        )
+        or 0,
+        "users": db.scalar(
+            select(func.count(User.id)).where(
+                User.company_id == company_id, User.active.is_(True)
+            )
+        )
+        or 0,
+        "assets": db.scalar(select(func.count(Asset.id)).where(Asset.company_id == company_id))
+        or 0,
+        "preventives": db.scalar(
+            select(func.count(PreventivePlan.id)).where(
+                PreventivePlan.company_id == company_id,
+                PreventivePlan.active.is_(True),
+            )
+        )
+        or 0,
+        "documents": db.scalar(
+            select(func.count(TechnicalDocument.id)).where(
+                TechnicalDocument.company_id == company_id
+            )
+        )
+        or 0,
+    }
+    items = [
+        SetupItem(
+            key="company",
+            label="Completar datos de empresa",
+            complete=company_complete,
+            href="/company",
+        ),
+        SetupItem(
+            key="plants",
+            label="Crear una planta activa",
+            complete=counts["plants"] > 0,
+            href="/plants",
+        ),
+        SetupItem(
+            key="users",
+            label="Incorporar al equipo",
+            complete=counts["users"] >= 2,
+            href="/users",
+        ),
+        SetupItem(
+            key="assets",
+            label="Registrar activos",
+            complete=counts["assets"] > 0,
+            href="/assets",
+        ),
+        SetupItem(
+            key="preventives",
+            label="Planificar preventivos",
+            complete=counts["preventives"] > 0,
+            href="/preventive-maintenance",
+        ),
+        SetupItem(
+            key="documents",
+            label="Cargar documentacion",
+            complete=counts["documents"] > 0,
+            href="/documents",
+        ),
+    ]
+    completed = sum(item.complete for item in items)
+    return PilotReadiness(
+        percent=round(completed / len(items) * 100),
+        completed=completed,
+        total=len(items),
+        items=items,
     )

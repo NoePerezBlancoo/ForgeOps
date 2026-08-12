@@ -8,10 +8,13 @@ import {
   Clock3,
   Factory,
   CalendarClock,
+  CircleCheck,
   PackageSearch,
+  Plus,
   TimerOff,
   Wrench,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   Bar,
@@ -30,6 +33,7 @@ import { useAuth } from "@/components/auth-provider";
 import { ErrorBanner, LoadingBlock } from "@/components/feedback";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
+import { useWorkspace } from "@/components/workspace-provider";
 import { ApiError } from "@/lib/api";
 import { formatDate, labelFor } from "@/lib/format";
 import type { DashboardData } from "@/lib/types";
@@ -53,16 +57,17 @@ const statusColors: Record<string, string> = {
 
 export default function DashboardPage() {
   const { request, user } = useAuth();
+  const { scopedPath, selectedPlant } = useWorkspace();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    request<DashboardData>("/dashboard")
+    request<DashboardData>(scopedPath("/dashboard"))
       .then(setData)
       .catch((requestError) =>
         setError(requestError instanceof ApiError ? requestError.message : "No se pudo cargar el dashboard"),
       );
-  }, [request]);
+  }, [request, scopedPath]);
 
   if (!data && !error) return <LoadingBlock />;
 
@@ -88,11 +93,23 @@ export default function DashboardPage() {
     <>
       <PageHeader
         title={`Buenos dias, ${user?.full_name.split(" ")[0] ?? "equipo"}`}
-        description="Estado operativo de MetalWorks Demo S.L. y carga actual del equipo de mantenimiento."
+        description={`Estado operativo de ${selectedPlant?.name ?? user?.company.name ?? "la empresa"} y carga actual del equipo de mantenimiento.`}
+        actions={<><Link href="/work-orders" className="button-secondary"><Wrench size={16} /> Ver ordenes</Link>{user?.role !== "VIEWER" && <Link href="/incidents?new=1" className="button-primary"><Plus size={16} /> Registrar incidencia</Link>}</>}
       />
       {error && <ErrorBanner message={error} />}
       {data && (
         <>
+          {user && ["SUPER_ADMIN", "ADMIN"].includes(user.role) && (
+            <section className="panel mb-5 flex flex-col gap-4 p-4 lg:flex-row lg:items-center">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="grid size-10 shrink-0 place-items-center rounded-md bg-emerald-50 text-emerald-700"><CircleCheck size={20} /></div>
+                <div><p className="text-sm font-bold">{data.readiness.percent === 100 ? "Preparacion para piloto completa" : "Preparacion para piloto"}</p><p className="mt-1 text-xs text-[var(--muted)]">{data.readiness.completed} de {data.readiness.total} bloques operativos configurados</p></div>
+              </div>
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#e8ecea]"><div className="h-full bg-[var(--accent)]" style={{ width: `${data.readiness.percent}%` }} /></div>
+              <strong className="text-sm">{data.readiness.percent}%</strong>
+              {data.readiness.items.find((item) => !item.complete) && <Link className="button-secondary" href={data.readiness.items.find((item) => !item.complete)!.href}>Continuar configuracion</Link>}
+            </section>
+          )}
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             {metrics.map((metric) => {
               const Icon = metric.icon;

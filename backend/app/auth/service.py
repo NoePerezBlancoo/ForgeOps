@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from app.audit.service import add_audit_event
 from app.auth.models import RefreshSession
 from app.auth.security import (
     create_access_token,
@@ -30,7 +31,7 @@ def authenticate(db: Session, email: str, password: str) -> User:
     return user
 
 
-def issue_session(db: Session, user: User) -> tuple[str, str]:
+def issue_session(db: Session, user: User, ip_address: str | None = None) -> tuple[str, str]:
     access_token = create_access_token(user.id)
     refresh_token, expires_at = create_refresh_token(user.id)
     db.add(
@@ -39,6 +40,17 @@ def issue_session(db: Session, user: User) -> tuple[str, str]:
             token_hash=token_digest(refresh_token),
             expires_at=expires_at,
         )
+    )
+    user.last_login_at = datetime.now(UTC)
+    add_audit_event(
+        db,
+        user.company_id,
+        user.id,
+        "LOGIN",
+        "SESSION",
+        "Inicio de sesion correcto",
+        user.id,
+        ip_address=ip_address,
     )
     db.commit()
     return access_token, refresh_token
@@ -69,6 +81,7 @@ def rotate_session(db: Session, refresh_token: str) -> tuple[User, str, str]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Cuenta no disponible")
 
     session.revoked_at = now
+    user.last_login_at = now
     access_token = create_access_token(user.id)
     new_refresh_token, expires_at = create_refresh_token(user.id)
     db.add(

@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -12,6 +14,8 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 @router.get("", response_model=DashboardRead)
 def index(
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+    plant_id: uuid.UUID | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> DashboardRead:
-    return dashboard_data(db, current_user.company_id)
+    return dashboard_data(db, current_user.company_id, plant_id)

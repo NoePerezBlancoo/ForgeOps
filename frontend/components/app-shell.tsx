@@ -4,15 +4,15 @@ import {
   Boxes,
   BrainCircuit,
   Building2,
-  ChevronDown,
   ClipboardList,
+  Factory,
   FileText,
   Gauge,
   LayoutDashboard,
   LogOut,
   Menu,
   PackageSearch,
-  Settings,
+  ShieldCheck,
   ShieldAlert,
   Users,
   Wrench,
@@ -23,6 +23,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
+import { useWorkspace } from "@/components/workspace-provider";
 import { initials, labelFor } from "@/lib/format";
 
 const primaryNavigation = [
@@ -43,9 +44,9 @@ const intelligenceNavigation = [
 ];
 
 const administrationNavigation = [
-  { label: "Empresa", icon: Building2 },
-  { label: "Usuarios", icon: Users },
-  { label: "Configuracion", icon: Settings },
+  { href: "/company", label: "Empresa", icon: Building2 },
+  { href: "/plants", label: "Plantas", icon: Factory },
+  { href: "/users", label: "Usuarios", icon: Users, adminOnly: true },
 ];
 
 const pageNames: Record<string, string> = {
@@ -57,12 +58,17 @@ const pageNames: Record<string, string> = {
   "/inventory": "Inventario de repuestos",
   "/documents": "Documentacion tecnica",
   "/knowledge": "Inteligencia documental",
+  "/company": "Datos de empresa",
+  "/plants": "Gestion de plantas",
+  "/users": "Equipo y permisos",
+  "/settings": "Seguridad y auditoria",
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { plants, plantsLoading, selectedPlantId, setSelectedPlantId } = useWorkspace();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   async function handleLogout() {
@@ -152,22 +158,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <p className="nav-heading mt-5">Administracion</p>
         <div className="space-y-1">
-          {administrationNavigation.map((item) => {
+          {administrationNavigation.filter((item) => !item.adminOnly || (user && ["SUPER_ADMIN", "ADMIN"].includes(user.role))).map((item) => {
             const Icon = item.icon;
+            const active = pathname === item.href;
             return (
-              <div key={item.label} className="nav-item cursor-not-allowed opacity-45" title={item.label}>
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={`nav-item ${active ? "nav-item-active" : ""}`}
+                title={item.label}
+              >
                 <Icon size={19} />
                 <span className="md:hidden lg:inline">{item.label}</span>
-              </div>
+              </Link>
             );
           })}
         </div>
       </nav>
 
-      <div className="border-t border-white/10 p-3">
-        <button onClick={handleLogout} className="nav-item w-full" title="Cerrar sesion">
+      <div className="grid grid-cols-2 gap-1 border-t border-white/10 p-3">
+        <Link href="/settings" className={`nav-item justify-center ${pathname === "/settings" ? "nav-item-active" : ""}`} title="Seguridad">
+          <ShieldCheck size={19} />
+          <span className="hidden lg:inline">Seguridad</span>
+        </Link>
+        <button onClick={handleLogout} className="nav-item justify-center" title="Cerrar sesion">
           <LogOut size={19} />
-          <span className="md:hidden lg:inline">Cerrar sesion</span>
+          <span className="hidden lg:inline">Salir</span>
         </button>
       </div>
     </>
@@ -195,11 +212,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <h1 className="text-[15px] font-bold text-[var(--ink)]">{pageNames[pathname] ?? "ForgeOps"}</h1>
           </div>
           <div className="ml-auto flex items-center gap-2 sm:gap-4">
-            <button className="hidden items-center gap-2 rounded-md border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold text-[var(--ink-soft)] sm:flex">
-              <span className="size-2 rounded-full bg-[var(--success)]" /> Planta Ourense <ChevronDown size={14} />
-            </button>
+            <label className="relative hidden sm:block">
+              <span className="pointer-events-none absolute left-3 top-1/2 size-2 -translate-y-1/2 rounded-full bg-[var(--success)]" />
+              <select
+                aria-label="Planta activa"
+                className="h-9 max-w-52 appearance-none rounded-md border border-[var(--line)] bg-white pl-7 pr-8 text-xs font-semibold text-[var(--ink-soft)]"
+                value={selectedPlantId}
+                onChange={(event) => setSelectedPlantId(event.target.value)}
+                disabled={plantsLoading}
+              >
+                <option value="">Todas las plantas</option>
+                {plants.map((plant) => (
+                  <option key={plant.id} value={plant.id}>{plant.name}</option>
+                ))}
+              </select>
+            </label>
             <div className="h-8 w-px bg-[var(--line)]" />
-            <div className="flex items-center gap-2.5">
+            <Link href="/settings" className="flex items-center gap-2.5" title="Perfil y seguridad">
               <div className="grid size-9 place-items-center rounded-md bg-[var(--ink)] text-xs font-bold text-white">
                 {initials(user?.full_name ?? "")}
               </div>
@@ -207,7 +236,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <p className="max-w-40 truncate text-xs font-bold">{user?.full_name}</p>
                 <p className="text-[10px] font-semibold text-[var(--muted)]">{user ? labelFor(user.role) : ""}</p>
               </div>
-            </div>
+            </Link>
           </div>
         </header>
         <main className="p-4 md:p-6 lg:p-8">{children}</main>

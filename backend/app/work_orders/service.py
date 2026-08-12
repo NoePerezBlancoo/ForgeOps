@@ -42,6 +42,7 @@ def list_work_orders(
     search: str | None = None,
     order_status: WorkOrderStatus | None = None,
     priority: Priority | None = None,
+    plant_id: uuid.UUID | None = None,
 ) -> list[WorkOrder]:
     query = _base_query().where(WorkOrder.company_id == current_user.company_id)
     if current_user.role == UserRole.TECHNICIAN:
@@ -55,6 +56,8 @@ def list_work_orders(
         query = query.where(WorkOrder.status == order_status)
     if priority:
         query = query.where(WorkOrder.priority == priority)
+    if plant_id:
+        query = query.where(WorkOrder.plant_id == plant_id)
     return list(db.scalars(query.order_by(WorkOrder.created_at.desc())))
 
 
@@ -88,7 +91,8 @@ def create_work_order(db: Session, current_user: User, payload: WorkOrderCreate)
     values = payload.model_dump()
     if payload.assigned_to and payload.status == WorkOrderStatus.OPEN:
         values["status"] = WorkOrderStatus.ASSIGNED
-    number = f"OT-{datetime.now(UTC):%y%m}-{uuid.uuid4().hex[:6].upper()}"
+    prefix = current_user.company.work_order_prefix
+    number = f"{prefix}-{datetime.now(UTC):%y%m}-{uuid.uuid4().hex[:6].upper()}"
     order = WorkOrder(
         company_id=current_user.company_id,
         created_by=current_user.id,

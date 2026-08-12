@@ -33,14 +33,33 @@ export interface CompanySummary {
   name: string;
 }
 
+export interface Company extends CompanySummary {
+  tax_id: string;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  industry: string | null;
+  timezone: string;
+  locale: string;
+  work_order_prefix: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface User {
   id: string;
   company_id: string;
   full_name: string;
   email: string;
+  job_title: string | null;
+  phone: string | null;
   role: UserRole;
   active: boolean;
+  last_login_at: string | null;
+  password_changed_at: string | null;
   created_at: string;
+  updated_at: string;
   company: CompanySummary;
 }
 
@@ -49,6 +68,7 @@ export interface UserOption {
   full_name: string;
   email: string;
   role: UserRole;
+  active: boolean;
 }
 
 export interface Plant {
@@ -59,6 +79,34 @@ export interface Plant {
   address: string | null;
   description: string | null;
   active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  summary: string;
+  context: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
+  actor: Pick<User, "id" | "full_name" | "email"> | null;
+}
+
+export interface AuditSummary {
+  total_events: number;
+  active_sessions: number;
+  administrators: number;
+  last_event_at: string | null;
+}
+
+export interface AuthSession {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  current: boolean;
 }
 
 export interface Asset {
@@ -131,6 +179,12 @@ export interface WorkOrder {
 }
 
 export interface DashboardData {
+  readiness: {
+    percent: number;
+    completed: number;
+    total: number;
+    items: Array<{ key: string; label: string; complete: boolean; href: string }>;
+  };
   active_assets: number;
   stopped_assets: number;
   maintenance_assets: number;

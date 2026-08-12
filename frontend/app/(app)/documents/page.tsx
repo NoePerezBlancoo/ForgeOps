@@ -8,12 +8,14 @@ import { EmptyState, ErrorBanner, LoadingBlock } from "@/components/feedback";
 import { Modal } from "@/components/modal";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
+import { useWorkspace } from "@/components/workspace-provider";
 import { ApiError } from "@/lib/api";
 import { formatDate, labelFor } from "@/lib/format";
 import type { Asset, DocumentType, TechnicalDocument } from "@/lib/types";
 
 export default function DocumentsPage() {
   const { request, download, user } = useAuth();
+  const { scopedPath } = useWorkspace();
   const [documents, setDocuments] = useState<TechnicalDocument[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,8 +39,8 @@ export default function DocumentsPage() {
     setError("");
     try {
       const [documentData, assetData] = await Promise.all([
-        request<TechnicalDocument[]>("/documents"),
-        request<Asset[]>("/assets"),
+        request<TechnicalDocument[]>(scopedPath("/documents")),
+        request<Asset[]>(scopedPath("/assets")),
       ]);
       setDocuments(documentData);
       setAssets(assetData);
@@ -47,7 +49,7 @@ export default function DocumentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [request]);
+  }, [request, scopedPath]);
 
   useEffect(() => {
     void loadData();

@@ -8,6 +8,7 @@ import { EmptyState, ErrorBanner, LoadingBlock } from "@/components/feedback";
 import { Modal } from "@/components/modal";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
+import { useWorkspace } from "@/components/workspace-provider";
 import { ApiError } from "@/lib/api";
 import { formatDate, labelFor } from "@/lib/format";
 import type { Asset, Priority, UserOption, WorkOrder, WorkOrderStatus, WorkOrderType } from "@/lib/types";
@@ -46,6 +47,7 @@ const emptyCreate: CreateForm = {
 
 export default function WorkOrdersPage() {
   const { request, user } = useAuth();
+  const { scopedPath } = useWorkspace();
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -69,9 +71,9 @@ export default function WorkOrdersPage() {
     setError("");
     try {
       const [orderData, assetData, userData] = await Promise.all([
-        request<WorkOrder[]>("/work-orders"),
-        request<Asset[]>("/assets"),
-        request<UserOption[]>("/users"),
+        request<WorkOrder[]>(scopedPath("/work-orders")),
+        request<Asset[]>(scopedPath("/assets")),
+        request<UserOption[]>("/users/options"),
       ]);
       setOrders(orderData);
       setAssets(assetData);
@@ -81,7 +83,7 @@ export default function WorkOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [request]);
+  }, [request, scopedPath]);
 
   useEffect(() => { void loadData(); }, [loadData]);
 

@@ -23,6 +23,7 @@ services:
       context: ./backend
     environment:
       APP_ENV: ${APP_ENV:-development}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-forgeops}:${POSTGRES_PASSWORD:-forgeops-local-only}@postgres:5432/${POSTGRES_DB:-forgeops}
       SECRET_KEY: ${SECRET_KEY:-development-key-change-before-deployment-2026}
       ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}

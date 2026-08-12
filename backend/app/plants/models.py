@@ -2,10 +2,10 @@ from sqlalchemy import Boolean, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.core.mixins import TenantMixin, UUIDPrimaryKeyMixin
+from app.core.mixins import TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 
-class Plant(UUIDPrimaryKeyMixin, TenantMixin, Base):
+class Plant(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     __tablename__ = "plants"
     __table_args__ = (UniqueConstraint("company_id", "code", name="uq_plants_company_code"),)
 

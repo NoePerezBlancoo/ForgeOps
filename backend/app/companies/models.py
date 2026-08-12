@@ -13,6 +13,10 @@ class Company(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     address: Mapped[str | None] = mapped_column(Text)
     phone: Mapped[str | None] = mapped_column(String(32))
     email: Mapped[str | None] = mapped_column(String(255))
+    industry: Mapped[str | None] = mapped_column(String(120))
+    timezone: Mapped[str] = mapped_column(String(64), default="Europe/Madrid", nullable=False)
+    locale: Mapped[str] = mapped_column(String(16), default="es-ES", nullable=False)
+    work_order_prefix: Mapped[str] = mapped_column(String(8), default="OT", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
     users: Mapped[list["User"]] = relationship(back_populates="company")  # noqa: F821
