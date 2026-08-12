@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createContext, useContext } from "react";
 
 import { ApiError, apiDownload, apiRequest } from "@/lib/api";
-import type { User } from "@/lib/types";
+import type { TrialRegistration, User } from "@/lib/types";
 
 interface SessionResponse {
   access_token: string;
@@ -17,6 +17,7 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  registerTrial: (payload: TrialRegistration) => Promise<void>;
   logout: () => Promise<void>;
   request: <T>(path: string, options?: RequestInit) => Promise<T>;
   download: (path: string) => Promise<Blob>;
@@ -66,6 +67,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(session.user);
   }, []);
 
+  const registerTrial = useCallback(async (payload: TrialRegistration) => {
+    const session = await apiRequest<SessionResponse>("/auth/register-trial", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    tokenRef.current = session.access_token;
+    setUser(session.user);
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await apiRequest("/auth/logout", { method: "POST", body: JSON.stringify({}) });
@@ -102,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, request, download }}>
+    <AuthContext.Provider value={{ user, loading, login, registerTrial, logout, request, download }}>
       {children}
     </AuthContext.Provider>
   );

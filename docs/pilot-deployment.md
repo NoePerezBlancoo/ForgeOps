@@ -22,9 +22,13 @@ SECRET_KEY=replace-with-at-least-32-random-characters
 FRONTEND_URL=https://forgeops.example.com
 NEXT_PUBLIC_API_URL=https://forgeops-api.example.com/api/v1
 COOKIE_SECURE=true
+TRIAL_DAYS=30
+TRIAL_SIGNUP_ENABLED=true
 ```
 
 No reutilices las credenciales demo. `APP_ENV=production` impide arrancar con la clave de desarrollo, cookies inseguras o una URL local.
+
+Desactiva `TRIAL_SIGNUP_ENABLED` en instalaciones privadas donde las empresas solo deban crearse mediante bootstrap. En una demo publica, aplica tambien limitacion de peticiones en el proxy inverso sobre `/api/v1/auth/register-trial`.
 
 ## Red
 
@@ -82,6 +86,7 @@ Despues del primer acceso:
 4. Revisa el indicador de preparacion para piloto.
 5. Desactiva cuentas que no participen en la implantacion.
 6. Verifica la descarga documental y el plan de copias.
+7. Revisa modulos activos, tutorial y politica de vencimiento de pruebas.
 
 ## Operacion
 

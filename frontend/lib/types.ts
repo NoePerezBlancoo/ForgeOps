@@ -5,6 +5,11 @@ export type UserRole =
   | "TECHNICIAN"
   | "VIEWER";
 
+export type CompanyPlan = "DEMO" | "TRIAL" | "PROFESSIONAL";
+export type SubscriptionStatus = "TRIAL" | "ACTIVE" | "SUSPENDED";
+export type AccessStatus = SubscriptionStatus | "EXPIRED";
+export type CompanyModule = "PREVENTIVE" | "INVENTORY" | "DOCUMENTS" | "KNOWLEDGE";
+
 export type AssetStatus = "ACTIVE" | "STOPPED" | "MAINTENANCE" | "OUT_OF_SERVICE";
 export type Criticality = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export type Priority = Criticality;
@@ -31,10 +36,17 @@ export type DocumentIndexStatus = "PENDING" | "INDEXING" | "READY" | "FAILED" | 
 export interface CompanySummary {
   id: string;
   name: string;
+  plan: CompanyPlan;
+  subscription_status: SubscriptionStatus;
+  access_status: AccessStatus;
+  trial_ends_at: string | null;
+  trial_days_remaining: number | null;
+  write_enabled: boolean;
+  enabled_modules: CompanyModule[];
 }
 
 export interface Company extends CompanySummary {
-  tax_id: string;
+  tax_id: string | null;
   address: string | null;
   phone: string | null;
   email: string | null;
@@ -42,6 +54,7 @@ export interface Company extends CompanySummary {
   timezone: string;
   locale: string;
   work_order_prefix: string;
+  trial_started_at: string | null;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -107,6 +120,35 @@ export interface AuthSession {
   created_at: string;
   expires_at: string;
   current: boolean;
+}
+
+export interface TrialRegistration {
+  company_name: string;
+  industry: string;
+  plant_name: string;
+  full_name: string;
+  email: string;
+  password: string;
+  sample_data: boolean;
+  terms_accepted: boolean;
+}
+
+export interface OnboardingStep {
+  key: string;
+  title: string;
+  description: string;
+  href: string;
+  complete: boolean;
+  automatic: boolean;
+}
+
+export interface Onboarding {
+  completed: number;
+  total: number;
+  percent: number;
+  tour_completed: boolean;
+  dismissed_at: string | null;
+  steps: OnboardingStep[];
 }
 
 export interface Asset {

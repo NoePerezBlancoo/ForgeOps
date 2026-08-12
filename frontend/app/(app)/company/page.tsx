@@ -51,7 +51,7 @@ export default function CompanyPage() {
       setCompany(loaded);
       setForm({
         name: loaded.name,
-        tax_id: loaded.tax_id,
+        tax_id: loaded.tax_id ?? "",
         industry: loaded.industry ?? "",
         email: loaded.email ?? "",
         phone: loaded.phone ?? "",

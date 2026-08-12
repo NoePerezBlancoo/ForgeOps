@@ -1,0 +1,91 @@
+name: forgeops-demo
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-forgeops}
+      POSTGRES_USER: ${POSTGRES_USER:-forgeops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - forgeops_demo_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-forgeops} -d ${POSTGRES_DB:-forgeops}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      APP_ENV: production
+      SEED_DEMO_DATA: "false"
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-forgeops}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-forgeops}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
+      REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-7}
+      TRIAL_DAYS: ${TRIAL_DAYS:-30}
+      TRIAL_SIGNUP_ENABLED: ${TRIAL_SIGNUP_ENABLED:-true}
+      FRONTEND_URL: https://${DEMO_DOMAIN:?DEMO_DOMAIN is required}
+      COOKIE_SECURE: "true"
+      UPLOAD_DIRECTORY: /app/uploads
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-15728640}
+      AI_PROVIDER: ${AI_PROVIDER:-local}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-5}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+    volumes:
+      - forgeops_demo_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: /api/v1
+        NEXT_PUBLIC_SALES_EMAIL: ${NEXT_PUBLIC_SALES_EMAIL:?NEXT_PUBLIC_SALES_EMAIL is required}
+        NEXT_PUBLIC_DEMO_CREDENTIALS: "false"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000').then(r => { if (!r.ok) process.exit(1) })"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      DEMO_DOMAIN: ${DEMO_DOMAIN:?DEMO_DOMAIN is required}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  forgeops_demo_postgres:
+  forgeops_demo_uploads:
+  caddy_data:
+  caddy_config:

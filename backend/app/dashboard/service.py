@@ -6,7 +6,13 @@ from sqlalchemy.orm import Session
 
 from app.assets.models import Asset
 from app.companies.models import Company
-from app.core.enums import AssetStatus, IncidentStatus, Priority, WorkOrderStatus
+from app.core.enums import (
+    AssetStatus,
+    CompanyModule,
+    IncidentStatus,
+    Priority,
+    WorkOrderStatus,
+)
 from app.dashboard.schemas import (
     ChartItem,
     DashboardRead,
@@ -203,6 +209,13 @@ def _pilot_readiness(db: Session, company_id: uuid.UUID) -> PilotReadiness:
             )
         )
         or 0,
+        "inventory": db.scalar(
+            select(func.count(InventoryItem.id)).where(
+                InventoryItem.company_id == company_id,
+                InventoryItem.active.is_(True),
+            )
+        )
+        or 0,
     }
     items = [
         SetupItem(
@@ -229,19 +242,35 @@ def _pilot_readiness(db: Session, company_id: uuid.UUID) -> PilotReadiness:
             complete=counts["assets"] > 0,
             href="/assets",
         ),
-        SetupItem(
-            key="preventives",
-            label="Planificar preventivos",
-            complete=counts["preventives"] > 0,
-            href="/preventive-maintenance",
-        ),
-        SetupItem(
-            key="documents",
-            label="Cargar documentacion",
-            complete=counts["documents"] > 0,
-            href="/documents",
-        ),
     ]
+    enabled = set(company.enabled_modules if company else [])
+    if CompanyModule.PREVENTIVE.value in enabled:
+        items.append(
+            SetupItem(
+                key="preventives",
+                label="Planificar preventivos",
+                complete=counts["preventives"] > 0,
+                href="/preventive-maintenance",
+            )
+        )
+    if CompanyModule.INVENTORY.value in enabled:
+        items.append(
+            SetupItem(
+                key="inventory",
+                label="Preparar el inventario",
+                complete=counts["inventory"] > 0,
+                href="/inventory",
+            )
+        )
+    if CompanyModule.DOCUMENTS.value in enabled:
+        items.append(
+            SetupItem(
+                key="documents",
+                label="Cargar documentacion",
+                complete=counts["documents"] > 0,
+                href="/documents",
+            )
+        )
     completed = sum(item.complete for item in items)
     return PilotReadiness(
         percent=round(completed / len(items) * 100),

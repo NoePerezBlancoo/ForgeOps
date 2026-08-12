@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     secret_key: str = "development-key-change-before-deployment-2026"
     access_token_minutes: int = 15
     refresh_token_days: int = 7
+    trial_days: int = Field(default=30, ge=1, le=90)
+    trial_signup_enabled: bool = True
     frontend_url: str = "http://localhost:3000"
     cookie_secure: bool = False
     upload_directory: str = "uploads"

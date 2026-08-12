@@ -4,6 +4,7 @@ import {
   Boxes,
   BrainCircuit,
   Building2,
+  CircleHelp,
   ClipboardList,
   Factory,
   FileText,
@@ -14,6 +15,7 @@ import {
   PackageSearch,
   ShieldCheck,
   ShieldAlert,
+  SlidersHorizontal,
   Users,
   Wrench,
   X,
@@ -23,8 +25,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
+import { AccessBlocked, ModuleUnavailable, TrialBanner } from "@/components/commercial-state";
+import { HelpDrawer } from "@/components/help-drawer";
 import { useWorkspace } from "@/components/workspace-provider";
 import { initials, labelFor } from "@/lib/format";
+import { moduleForPath } from "@/lib/modules";
 
 const primaryNavigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -34,19 +39,20 @@ const primaryNavigation = [
 ];
 
 const planningNavigation = [
-  { href: "/preventive-maintenance", label: "Preventivos", icon: Wrench },
-  { href: "/inventory", label: "Inventario", icon: PackageSearch },
-  { href: "/documents", label: "Documentos", icon: FileText },
+  { href: "/preventive-maintenance", label: "Preventivos", icon: Wrench, module: "PREVENTIVE" as const },
+  { href: "/inventory", label: "Inventario", icon: PackageSearch, module: "INVENTORY" as const },
+  { href: "/documents", label: "Documentos", icon: FileText, module: "DOCUMENTS" as const },
 ];
 
 const intelligenceNavigation = [
-  { href: "/knowledge", label: "Asistente documental", icon: BrainCircuit },
+  { href: "/knowledge", label: "Asistente documental", icon: BrainCircuit, module: "KNOWLEDGE" as const },
 ];
 
 const administrationNavigation = [
   { href: "/company", label: "Empresa", icon: Building2 },
   { href: "/plants", label: "Plantas", icon: Factory },
   { href: "/users", label: "Usuarios", icon: Users, adminOnly: true },
+  { href: "/modules", label: "Modulos", icon: SlidersHorizontal, adminOnly: true },
 ];
 
 const pageNames: Record<string, string> = {
@@ -61,6 +67,8 @@ const pageNames: Record<string, string> = {
   "/company": "Datos de empresa",
   "/plants": "Gestion de plantas",
   "/users": "Equipo y permisos",
+  "/modules": "Modulos de trabajo",
+  "/getting-started": "Primeros pasos",
   "/settings": "Seguridad y auditoria",
 };
 
@@ -68,8 +76,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const { plants, plantsLoading, selectedPlantId, setSelectedPlantId } = useWorkspace();
+  const { company, isModuleEnabled, plants, plantsLoading, selectedPlantId, setSelectedPlantId } = useWorkspace();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const requiredModule = moduleForPath[pathname];
+  const moduleBlocked = requiredModule && !isModuleEnabled(requiredModule);
+  const accessBlocked = company && ["EXPIRED", "SUSPENDED"].includes(company.access_status) && !["/settings", "/getting-started"].includes(pathname);
 
   async function handleLogout() {
     await logout();
@@ -118,7 +130,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <p className="nav-heading mt-5">Planificacion</p>
         <div className="space-y-1">
-          {planningNavigation.map((item) => {
+          {planningNavigation.filter((item) => isModuleEnabled(item.module)).map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
             return (
@@ -138,7 +150,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <p className="nav-heading mt-5">Inteligencia</p>
         <div className="space-y-1">
-          {intelligenceNavigation.map((item) => {
+          {intelligenceNavigation.filter((item) => isModuleEnabled(item.module)).map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
             return (
@@ -177,7 +189,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      <div className="grid grid-cols-2 gap-1 border-t border-white/10 p-3">
+      <div className="grid grid-cols-3 gap-1 border-t border-white/10 p-3">
+        <button onClick={() => setHelpOpen(true)} className="nav-item justify-center" title="Ayuda">
+          <CircleHelp size={19} />
+          <span className="hidden lg:inline">Ayuda</span>
+        </button>
         <Link href="/settings" className={`nav-item justify-center ${pathname === "/settings" ? "nav-item-active" : ""}`} title="Seguridad">
           <ShieldCheck size={19} />
           <span className="hidden lg:inline">Seguridad</span>
@@ -227,6 +243,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 ))}
               </select>
             </label>
+            <button className="icon-button hidden sm:inline-grid" onClick={() => setHelpOpen(true)} aria-label="Abrir ayuda" title="Ayuda y tutorial">
+              <CircleHelp size={18} />
+            </button>
             <div className="h-8 w-px bg-[var(--line)]" />
             <Link href="/settings" className="flex items-center gap-2.5" title="Perfil y seguridad">
               <div className="grid size-9 place-items-center rounded-md bg-[var(--ink)] text-xs font-bold text-white">
@@ -239,8 +258,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
         </header>
-        <main className="p-4 md:p-6 lg:p-8">{children}</main>
+        {company && <TrialBanner company={company} />}
+        <main className="p-4 md:p-6 lg:p-8">
+          {accessBlocked && company ? (
+            <AccessBlocked company={company} />
+          ) : moduleBlocked ? (
+            <ModuleUnavailable module={requiredModule} role={user?.role} />
+          ) : children}
+        </main>
       </div>
+      <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }

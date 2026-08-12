@@ -1,6 +1,6 @@
 # Arquitectura de ForgeOps
 
-ForgeOps V1.0 es un monolito modular con dos aplicaciones desplegables, almacenamiento documental privado y PostgreSQL con `pgvector`.
+ForgeOps V1.1 es un monolito modular multiempresa con dos aplicaciones desplegables, almacenamiento documental privado y PostgreSQL con `pgvector`.
 
 ```text
 Browser -> Next.js -> FastAPI -> PostgreSQL + pgvector
@@ -26,6 +26,7 @@ inventory   repuestos y movimientos
 documents   archivos privados
 ai          ingesta, recuperacion y RAG
 dashboard   KPIs y onboarding
+onboarding  progreso individual y tutorial guiado
 ```
 
 ## Decisiones
@@ -40,6 +41,15 @@ dashboard   KPIs y onboarding
 - Semilla idempotente apoyada en restricciones unicas.
 - Archivos fuera del directorio publico y descargas autenticadas.
 - Auditoria separada de los datos operativos y conservacion del actor cuando existe.
+- Suscripcion y modulos resueltos en el contexto de empresa, nunca desde el navegador.
+- Caducidad de pruebas evaluada en cada acceso y escritura bloqueada con HTTP 402.
+- Nucleo operativo siempre activo; modulos opcionales protegidos tanto en API como en UI.
+
+## Modulos comerciales
+
+`assets`, `incidents` y `work_orders` forman el nucleo trazable. `maintenance`, `inventory`, `documents` y `ai` se habilitan por empresa mediante `enabled_modules`. El asistente documental depende de Documentacion, y la API aplica esta dependencia aunque una ruta se invoque directamente.
+
+El registro de prueba crea empresa, administrador y planta dentro de una unica transaccion. Los datos de ejemplo son propios de ese tenant; no se comparte una base demostrativa entre evaluadores.
 
 ## Limites de dominio
 

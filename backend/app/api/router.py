@@ -10,6 +10,7 @@ from app.documents.routes import router as documents_router
 from app.incidents.routes import router as incidents_router
 from app.inventory.routes import router as inventory_router
 from app.maintenance.routes import router as maintenance_router
+from app.onboarding.routes import router as onboarding_router
 from app.plants.routes import router as plants_router
 from app.users.routes import router as users_router
 from app.work_orders.routes import router as work_orders_router
@@ -27,4 +28,5 @@ api_router.include_router(inventory_router)
 api_router.include_router(documents_router)
 api_router.include_router(ai_router)
 api_router.include_router(audit_router)
+api_router.include_router(onboarding_router)
 api_router.include_router(dashboard_router)

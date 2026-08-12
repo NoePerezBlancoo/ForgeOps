@@ -8,7 +8,7 @@ from app.audit.service import add_audit_event
 from app.auth.security import hash_password
 from app.companies.models import Company
 from app.core.database import SessionLocal
-from app.core.enums import UserRole
+from app.core.enums import CompanyPlan, SubscriptionStatus, UserRole
 from app.models import *  # noqa: F403
 from app.plants.models import Plant
 from app.users.models import User
@@ -52,6 +52,8 @@ def main() -> None:
                 timezone=os.getenv("BOOTSTRAP_TIMEZONE", "Europe/Madrid"),
                 locale=os.getenv("BOOTSTRAP_LOCALE", "es-ES"),
                 work_order_prefix=os.getenv("BOOTSTRAP_WORK_ORDER_PREFIX", "OT").upper(),
+                plan=CompanyPlan.PROFESSIONAL,
+                subscription_status=SubscriptionStatus.ACTIVE,
                 active=True,
             )
             db.add(company)
