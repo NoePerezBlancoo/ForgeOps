@@ -23,6 +23,9 @@ export type WorkOrderStatus =
   | "COMPLETED"
   | "CANCELLED";
 export type WorkOrderType = "CORRECTIVE" | "PREVENTIVE" | "INSPECTION" | "IMPROVEMENT";
+export type FrequencyType = "DAYS" | "WEEKS" | "MONTHS" | "YEARS";
+export type InventoryMovementType = "RECEIPT" | "CONSUMPTION" | "ADJUSTMENT";
+export type DocumentType = "MANUAL" | "ELECTRICAL_SCHEMATIC" | "PROCEDURE" | "SAFETY" | "OTHER";
 
 export interface CompanySummary {
   id: string;
@@ -105,6 +108,7 @@ export interface WorkOrder {
   plant_id: string;
   asset_id: string;
   incident_id: string | null;
+  preventive_plan_id: string | null;
   assigned_to: string | null;
   created_by: string;
   number: string;
@@ -134,6 +138,8 @@ export interface DashboardData {
   pending_work_orders: number;
   in_progress_work_orders: number;
   completed_work_orders: number;
+  upcoming_preventive_count: number;
+  low_stock_items: number;
   downtime_hours: number;
   asset_statuses: Array<{ label: string; value: number }>;
   work_order_statuses: Array<{ label: string; value: number }>;
@@ -156,3 +162,67 @@ export interface DashboardData {
   }>;
 }
 
+export interface PreventivePlan {
+  id: string;
+  company_id: string;
+  asset_id: string;
+  assigned_to: string | null;
+  name: string;
+  description: string;
+  frequency_type: FrequencyType;
+  frequency_value: number;
+  next_execution: string;
+  estimated_duration: number;
+  priority: Priority;
+  active: boolean;
+  last_generated_at: string | null;
+  created_at: string;
+  updated_at: string;
+  asset: Pick<Asset, "id" | "code" | "name">;
+  assignee: Pick<User, "id" | "full_name" | "email"> | null;
+}
+
+export interface InventoryItem {
+  id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  stock: string;
+  minimum_stock: string;
+  unit: string;
+  location: string | null;
+  cost: string | null;
+  active: boolean;
+  low_stock: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InventoryMovement {
+  id: string;
+  item_id: string;
+  user_id: string;
+  movement_type: InventoryMovementType;
+  quantity: string;
+  resulting_stock: string;
+  reason: string;
+  created_at: string;
+  user: Pick<User, "id" | "full_name" | "email">;
+}
+
+export interface TechnicalDocument {
+  id: string;
+  company_id: string;
+  asset_id: string;
+  uploaded_by: string;
+  name: string;
+  type: DocumentType;
+  original_name: string;
+  mime_type: string;
+  file_size: number;
+  description: string | null;
+  uploaded_at: string;
+  asset: Pick<Asset, "id" | "code" | "name">;
+  uploader: Pick<User, "id" | "full_name" | "email">;
+}

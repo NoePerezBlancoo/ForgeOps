@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     refresh_token_days: int = 7
     frontend_url: str = "http://localhost:3000"
     cookie_secure: bool = False
+    upload_directory: str = "uploads"
+    max_upload_bytes: int = 15 * 1024 * 1024
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

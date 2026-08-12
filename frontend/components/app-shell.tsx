@@ -31,10 +31,10 @@ const primaryNavigation = [
   { href: "/assets", label: "Activos", icon: Boxes },
 ];
 
-const futureNavigation = [
-  { label: "Preventivos", icon: Wrench },
-  { label: "Inventario", icon: PackageSearch },
-  { label: "Documentos", icon: FileText },
+const planningNavigation = [
+  { href: "/preventive-maintenance", label: "Preventivos", icon: Wrench },
+  { href: "/inventory", label: "Inventario", icon: PackageSearch },
+  { href: "/documents", label: "Documentos", icon: FileText },
 ];
 
 const administrationNavigation = [
@@ -48,6 +48,9 @@ const pageNames: Record<string, string> = {
   "/assets": "Activos industriales",
   "/incidents": "Gestion de incidencias",
   "/work-orders": "Ordenes de trabajo",
+  "/preventive-maintenance": "Mantenimiento preventivo",
+  "/inventory": "Inventario de repuestos",
+  "/documents": "Documentacion tecnica",
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -101,16 +104,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </div>
 
-        <p className="nav-heading mt-7">Siguiente fase</p>
+        <p className="nav-heading mt-7">Planificacion</p>
         <div className="space-y-1">
-          {futureNavigation.map((item) => {
+          {planningNavigation.map((item) => {
             const Icon = item.icon;
+            const active = pathname === item.href;
             return (
-              <div key={item.label} className="nav-item cursor-not-allowed opacity-45" title={`${item.label} - V0.2`}>
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={`nav-item ${active ? "nav-item-active" : ""}`}
+                title={item.label}
+              >
                 <Icon size={19} />
                 <span className="md:hidden lg:inline">{item.label}</span>
-                <span className="ml-auto rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-bold md:hidden lg:inline">V0.2</span>
-              </div>
+              </Link>
             );
           })}
         </div>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createContext, useContext } from "react";
 
-import { ApiError, apiRequest } from "@/lib/api";
+import { ApiError, apiDownload, apiRequest } from "@/lib/api";
 import type { User } from "@/lib/types";
 
 interface SessionResponse {
@@ -19,6 +19,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   request: <T>(path: string, options?: RequestInit) => Promise<T>;
+  download: (path: string) => Promise<Blob>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -87,8 +88,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [renew],
   );
 
+  const download = useCallback(
+    async (path: string): Promise<Blob> => {
+      try {
+        return await apiDownload(path, tokenRef.current);
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 401) throw error;
+        const token = await renew();
+        return apiDownload(path, token);
+      }
+    },
+    [renew],
+  );
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, request }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, request, download }}>
       {children}
     </AuthContext.Provider>
   );
@@ -99,4 +113,3 @@ export function useAuth(): AuthContextValue {
   if (!context) throw new Error("useAuth debe utilizarse dentro de AuthProvider");
   return context;
 }
-

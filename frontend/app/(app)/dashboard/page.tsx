@@ -7,6 +7,8 @@ import {
   CheckCircle2,
   Clock3,
   Factory,
+  CalendarClock,
+  PackageSearch,
   TimerOff,
   Wrench,
 } from "lucide-react";
@@ -74,6 +76,8 @@ export default function DashboardPage() {
         { label: "Completadas", value: data.completed_work_orders, icon: CheckCircle2, tone: "text-emerald-700 bg-emerald-50" },
         { label: "Parada ultimos 30 dias", value: `${data.downtime_hours} h`, icon: Activity, tone: "text-violet-700 bg-violet-50" },
         { label: "Criticas abiertas", value: data.critical_incidents, icon: Factory, tone: "text-red-700 bg-red-50" },
+        { label: "Preventivos proximos", value: data.upcoming_preventive_count, icon: CalendarClock, tone: "text-teal-700 bg-teal-50" },
+        { label: "Repuestos bajo minimo", value: data.low_stock_items, icon: PackageSearch, tone: "text-orange-700 bg-orange-50" },
       ]
     : [];
 
@@ -89,11 +93,11 @@ export default function DashboardPage() {
       {error && <ErrorBanner message={error} />}
       {data && (
         <>
-          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
+          <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             {metrics.map((metric) => {
               const Icon = metric.icon;
               return (
-                <article key={metric.label} className="panel min-h-31 p-4 xl:col-span-2">
+                <article key={metric.label} className="panel min-h-31 p-4">
                   <div className={`grid size-8 place-items-center rounded-md ${metric.tone}`}>
                     <Icon size={17} />
                   </div>
@@ -204,4 +208,3 @@ export default function DashboardPage() {
 function ClipboardListIcon() {
   return <Wrench size={17} />;
 }
-

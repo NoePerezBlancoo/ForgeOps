@@ -53,3 +53,24 @@ class WorkOrderStatus(StrEnum):
     WAITING = "WAITING"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
+
+
+class FrequencyType(StrEnum):
+    DAYS = "DAYS"
+    WEEKS = "WEEKS"
+    MONTHS = "MONTHS"
+    YEARS = "YEARS"
+
+
+class InventoryMovementType(StrEnum):
+    RECEIPT = "RECEIPT"
+    CONSUMPTION = "CONSUMPTION"
+    ADJUSTMENT = "ADJUSTMENT"
+
+
+class DocumentType(StrEnum):
+    MANUAL = "MANUAL"
+    ELECTRICAL_SCHEMATIC = "ELECTRICAL_SCHEMATIC"
+    PROCEDURE = "PROCEDURE"
+    SAFETY = "SAFETY"
+    OTHER = "OTHER"

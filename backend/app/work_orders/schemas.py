@@ -47,6 +47,7 @@ class WorkOrderRead(ORMModel):
     plant_id: UUID
     asset_id: UUID
     incident_id: UUID | None
+    preventive_plan_id: UUID | None
     assigned_to: UUID | None
     created_by: UUID
     number: str

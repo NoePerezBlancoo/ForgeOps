@@ -43,6 +43,8 @@ class DashboardRead(BaseModel):
     pending_work_orders: int
     in_progress_work_orders: int
     completed_work_orders: int
+    upcoming_preventive_count: int
+    low_stock_items: int
     downtime_hours: float
     asset_statuses: list[ChartItem]
     work_order_statuses: list[ChartItem]
