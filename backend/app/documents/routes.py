@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user, require_roles
+from app.auth.dependencies import get_current_user, require_module, require_roles
 from app.core.database import get_db
-from app.core.enums import DocumentType, UserRole
+from app.core.enums import CompanyModule, DocumentType, UserRole
 from app.documents.schemas import TechnicalDocumentRead, TechnicalDocumentUpdate
 from app.documents.service import (
     create_document,
@@ -18,7 +18,11 @@ from app.documents.service import (
 from app.documents.storage import LocalDocumentStorage, get_document_storage
 from app.users.models import User
 
-router = APIRouter(prefix="/documents", tags=["Documentos tecnicos"])
+router = APIRouter(
+    prefix="/documents",
+    tags=["Documentos tecnicos"],
+    dependencies=[Depends(require_module(CompanyModule.DOCUMENTS))],
+)
 managers = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAINTENANCE_MANAGER)
 
 

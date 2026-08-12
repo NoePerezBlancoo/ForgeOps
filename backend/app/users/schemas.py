@@ -3,6 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.companies.schemas import CompanySummary
 from app.core.enums import UserRole
 from app.core.schemas import ORMModel
 
@@ -55,11 +56,6 @@ class UserPasswordReset(BaseModel):
 
 class UserPasswordChange(UserPasswordReset):
     current_password: str = Field(min_length=8, max_length=128)
-
-
-class CompanySummary(ORMModel):
-    id: UUID
-    name: str
 
 
 class UserRead(ORMModel):

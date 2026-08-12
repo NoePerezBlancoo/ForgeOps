@@ -1,20 +1,30 @@
 import uuid
 from collections.abc import Callable
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.security import decode_token
 from app.core.database import get_db
-from app.core.enums import UserRole
+from app.core.enums import CompanyModule, UserRole
 from app.users.models import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+WRITE_WHITELIST = {
+    "/api/v1/auth/password",
+    "/api/v1/auth/sessions/revoke-others",
+}
+
+
+def get_current_user(
+    request: Request,
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User:
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="No se pudo validar la sesion",
@@ -33,6 +43,15 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     )
     if not user or not user.company.active:
         raise credentials_error
+    if (
+        request.method not in {"GET", "HEAD", "OPTIONS"}
+        and request.url.path not in WRITE_WHITELIST
+        and not user.company.write_enabled
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="La prueba ha finalizado. Activa un plan para continuar operando.",
+        )
     return user
 
 
@@ -42,6 +61,18 @@ def require_roles(*roles: UserRole) -> Callable:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para realizar esta accion",
+            )
+        return current_user
+
+    return dependency
+
+
+def require_module(module: CompanyModule) -> Callable:
+    def dependency(current_user: User = Depends(get_current_user)) -> User:
+        if module.value not in current_user.company.enabled_modules:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Este modulo no esta activo para la empresa",
             )
         return current_user
 

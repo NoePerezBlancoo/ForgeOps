@@ -1,0 +1,16 @@
+{$DEMO_DOMAIN} {
+	encode zstd gzip
+
+	@backend path /api/* /health /ready /docs* /redoc*
+	reverse_proxy @backend backend:8000
+	reverse_proxy frontend:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Content-Security-Policy "frame-ancestors 'none'"
+	}
+}

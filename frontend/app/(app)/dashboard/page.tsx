@@ -8,7 +8,7 @@ import {
   Clock3,
   Factory,
   CalendarClock,
-  CircleCheck,
+  Compass,
   PackageSearch,
   Plus,
   TimerOff,
@@ -57,7 +57,7 @@ const statusColors: Record<string, string> = {
 
 export default function DashboardPage() {
   const { request, user } = useAuth();
-  const { scopedPath, selectedPlant } = useWorkspace();
+  const { isModuleEnabled, onboarding, scopedPath, selectedPlant } = useWorkspace();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
 
@@ -81,9 +81,9 @@ export default function DashboardPage() {
         { label: "Completadas", value: data.completed_work_orders, icon: CheckCircle2, tone: "text-emerald-700 bg-emerald-50" },
         { label: "Parada ultimos 30 dias", value: `${data.downtime_hours} h`, icon: Activity, tone: "text-violet-700 bg-violet-50" },
         { label: "Criticas abiertas", value: data.critical_incidents, icon: Factory, tone: "text-red-700 bg-red-50" },
-        { label: "Preventivos proximos", value: data.upcoming_preventive_count, icon: CalendarClock, tone: "text-teal-700 bg-teal-50" },
-        { label: "Repuestos bajo minimo", value: data.low_stock_items, icon: PackageSearch, tone: "text-orange-700 bg-orange-50" },
-      ]
+        isModuleEnabled("PREVENTIVE") ? { label: "Preventivos proximos", value: data.upcoming_preventive_count, icon: CalendarClock, tone: "text-teal-700 bg-teal-50" } : null,
+        isModuleEnabled("INVENTORY") ? { label: "Repuestos bajo minimo", value: data.low_stock_items, icon: PackageSearch, tone: "text-orange-700 bg-orange-50" } : null,
+      ].filter((metric): metric is NonNullable<typeof metric> => metric !== null)
     : [];
 
   const assetChart = data?.asset_statuses.map((item) => ({ ...item, name: labelFor(item.label) })) ?? [];
@@ -99,15 +99,14 @@ export default function DashboardPage() {
       {error && <ErrorBanner message={error} />}
       {data && (
         <>
-          {user && ["SUPER_ADMIN", "ADMIN"].includes(user.role) && (
-            <section className="panel mb-5 flex flex-col gap-4 p-4 lg:flex-row lg:items-center">
+          {onboarding && onboarding.percent < 100 && (
+            <section className="panel mb-5 flex flex-col gap-4 border-l-4 border-l-[var(--accent)] p-4 lg:flex-row lg:items-center">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="grid size-10 shrink-0 place-items-center rounded-md bg-emerald-50 text-emerald-700"><CircleCheck size={20} /></div>
-                <div><p className="text-sm font-bold">{data.readiness.percent === 100 ? "Preparacion para piloto completa" : "Preparacion para piloto"}</p><p className="mt-1 text-xs text-[var(--muted)]">{data.readiness.completed} de {data.readiness.total} bloques operativos configurados</p></div>
+                <div className="grid size-10 shrink-0 place-items-center rounded-md bg-cyan-50 text-cyan-800"><Compass size={20} /></div>
+                <div><p className="text-sm font-bold">Continua la puesta en marcha</p><p className="mt-1 text-xs text-[var(--muted)]">{onboarding.completed} de {onboarding.total} pasos completados. ForgeOps te indica el siguiente.</p></div>
               </div>
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#e8ecea]"><div className="h-full bg-[var(--accent)]" style={{ width: `${data.readiness.percent}%` }} /></div>
-              <strong className="text-sm">{data.readiness.percent}%</strong>
-              {data.readiness.items.find((item) => !item.complete) && <Link className="button-secondary" href={data.readiness.items.find((item) => !item.complete)!.href}>Continuar configuracion</Link>}
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#e8ecea]"><div className="h-full bg-[var(--accent)]" style={{ width: `${onboarding.percent}%` }} /></div>
+              <Link className="button-secondary justify-center" href="/getting-started">Abrir guia <ArrowRightIcon /></Link>
             </section>
           )}
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -224,4 +223,8 @@ export default function DashboardPage() {
 
 function ClipboardListIcon() {
   return <Wrench size={17} />;
+}
+
+function ArrowRightIcon() {
+  return <span aria-hidden>→</span>;
 }

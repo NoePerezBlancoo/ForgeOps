@@ -12,6 +12,7 @@ from app.auth.schemas import (
     SessionRead,
     SessionsRevokedRead,
     TokenResponse,
+    TrialRegistration,
     UserPasswordChange,
 )
 from app.auth.security import token_digest
@@ -22,6 +23,7 @@ from app.auth.service import (
     rotate_session,
     token_expires_in,
 )
+from app.companies.trial_service import register_trial
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.schemas import MessageResponse
@@ -42,6 +44,25 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
         secure=settings.cookie_secure,
         samesite="lax",
         path="/api/v1/auth",
+    )
+
+
+@router.post("/register-trial", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+def create_trial(
+    payload: TrialRegistration,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    user = register_trial(db, payload)
+    access_token, refresh_token = issue_session(
+        db, user, request.client.host if request.client else None
+    )
+    _set_refresh_cookie(response, refresh_token)
+    return TokenResponse(
+        access_token=access_token,
+        expires_in=token_expires_in(),
+        user=UserRead.model_validate(user),
     )
 
 

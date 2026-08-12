@@ -3,9 +3,9 @@ import uuid
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user, require_roles
+from app.auth.dependencies import get_current_user, require_module, require_roles
 from app.core.database import get_db
-from app.core.enums import UserRole
+from app.core.enums import CompanyModule, UserRole
 from app.maintenance.schemas import (
     GenerationSummary,
     PreventivePlanCreate,
@@ -23,7 +23,11 @@ from app.maintenance.service import (
 from app.users.models import User
 from app.work_orders.schemas import WorkOrderRead
 
-router = APIRouter(prefix="/preventive-maintenance", tags=["Mantenimiento preventivo"])
+router = APIRouter(
+    prefix="/preventive-maintenance",
+    tags=["Mantenimiento preventivo"],
+    dependencies=[Depends(require_module(CompanyModule.PREVENTIVE))],
+)
 managers = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAINTENANCE_MANAGER)
 
 

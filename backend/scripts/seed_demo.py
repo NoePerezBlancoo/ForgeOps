@@ -9,12 +9,14 @@ from app.companies.models import Company
 from app.core.database import SessionLocal
 from app.core.enums import (
     AssetStatus,
+    CompanyPlan,
     Criticality,
     DocumentType,
     FrequencyType,
     IncidentStatus,
     InventoryMovementType,
     Priority,
+    SubscriptionStatus,
     UserRole,
     WorkOrderStatus,
     WorkOrderType,
@@ -37,6 +39,8 @@ def get_or_create_company(db) -> Company:
         company.timezone = "Europe/Madrid"
         company.locale = "es-ES"
         company.work_order_prefix = "OT"
+        company.plan = CompanyPlan.DEMO
+        company.subscription_status = SubscriptionStatus.ACTIVE
         return company
     company = Company(
         name="MetalWorks Demo S.L.",
@@ -48,6 +52,8 @@ def get_or_create_company(db) -> Company:
         timezone="Europe/Madrid",
         locale="es-ES",
         work_order_prefix="OT",
+        plan=CompanyPlan.DEMO,
+        subscription_status=SubscriptionStatus.ACTIVE,
         active=True,
     )
     db.add(company)

@@ -3,9 +3,9 @@ import uuid
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user, require_roles
+from app.auth.dependencies import get_current_user, require_module, require_roles
 from app.core.database import get_db
-from app.core.enums import UserRole
+from app.core.enums import CompanyModule, UserRole
 from app.inventory.schemas import (
     InventoryItemCreate,
     InventoryItemRead,
@@ -23,7 +23,11 @@ from app.inventory.service import (
 )
 from app.users.models import User
 
-router = APIRouter(prefix="/inventory", tags=["Inventario"])
+router = APIRouter(
+    prefix="/inventory",
+    tags=["Inventario"],
+    dependencies=[Depends(require_module(CompanyModule.INVENTORY))],
+)
 managers = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAINTENANCE_MANAGER)
 
 

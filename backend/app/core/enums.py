@@ -9,6 +9,25 @@ class UserRole(StrEnum):
     VIEWER = "VIEWER"
 
 
+class CompanyPlan(StrEnum):
+    DEMO = "DEMO"
+    TRIAL = "TRIAL"
+    PROFESSIONAL = "PROFESSIONAL"
+
+
+class SubscriptionStatus(StrEnum):
+    TRIAL = "TRIAL"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+
+
+class CompanyModule(StrEnum):
+    PREVENTIVE = "PREVENTIVE"
+    INVENTORY = "INVENTORY"
+    DOCUMENTS = "DOCUMENTS"
+    KNOWLEDGE = "KNOWLEDGE"
+
+
 class AssetStatus(StrEnum):
     ACTIVE = "ACTIVE"
     STOPPED = "STOPPED"

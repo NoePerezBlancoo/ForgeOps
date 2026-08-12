@@ -19,13 +19,17 @@ from app.ai.service import (
     query_history,
     query_knowledge,
 )
-from app.auth.dependencies import get_current_user, require_roles
+from app.auth.dependencies import get_current_user, require_module, require_roles
 from app.core.database import get_db
-from app.core.enums import UserRole
+from app.core.enums import CompanyModule, UserRole
 from app.documents.storage import LocalDocumentStorage, get_document_storage
 from app.users.models import User
 
-router = APIRouter(prefix="/ai", tags=["Asistente documental"])
+router = APIRouter(
+    prefix="/ai",
+    tags=["Asistente documental"],
+    dependencies=[Depends(require_module(CompanyModule.KNOWLEDGE))],
+)
 managers = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAINTENANCE_MANAGER)
 
 

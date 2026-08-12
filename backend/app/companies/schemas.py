@@ -1,15 +1,26 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.core.enums import CompanyModule, CompanyPlan, SubscriptionStatus
 from app.core.schemas import ORMModel
 
 
-class CompanyRead(ORMModel):
+class CompanySummary(ORMModel):
     id: UUID
     name: str
-    tax_id: str
+    plan: CompanyPlan
+    subscription_status: SubscriptionStatus
+    access_status: str
+    trial_ends_at: datetime | None
+    trial_days_remaining: int | None
+    write_enabled: bool
+    enabled_modules: list[CompanyModule]
+
+
+class CompanyRead(CompanySummary):
+    tax_id: str | None
     address: str | None
     phone: str | None
     email: str | None
@@ -17,6 +28,7 @@ class CompanyRead(ORMModel):
     timezone: str
     locale: str
     work_order_prefix: str
+    trial_started_at: datetime | None
     active: bool
     created_at: datetime
     updated_at: datetime
@@ -47,3 +59,15 @@ class CompanyUpdate(BaseModel):
         if not normalized.isalnum():
             raise ValueError("El prefijo solo puede contener letras y numeros")
         return normalized
+
+
+class CompanyModulesUpdate(BaseModel):
+    enabled_modules: list[CompanyModule]
+
+    @model_validator(mode="after")
+    def validate_dependencies(self):
+        selected = set(self.enabled_modules)
+        if CompanyModule.KNOWLEDGE in selected:
+            selected.add(CompanyModule.DOCUMENTS)
+        self.enabled_modules = [module for module in CompanyModule if module in selected]
+        return self
