@@ -16,7 +16,7 @@ logger = logging.getLogger("forgeops")
 
 app = FastAPI(
     title=settings.app_name,
-    version="1.1.0",
+    version="1.2.0",
     description="API multiempresa para mantenimiento e inteligencia documental industrial.",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -48,7 +48,9 @@ async def request_context(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Cross-Origin-Resource-Policy"] = "same-site"
     response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
-    if request.url.path.startswith(f"{settings.api_prefix}/auth"):
+    if request.url.path.startswith(
+        (f"{settings.api_prefix}/auth", f"{settings.api_prefix}/operator")
+    ):
         response.headers["Cache-Control"] = "no-store"
     if settings.cookie_secure:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -66,7 +68,7 @@ async def request_context(request: Request, call_next):
 
 @app.get("/health", tags=["Sistema"])
 def health() -> dict[str, str]:
-    return {"status": "ok", "version": "1.1.0"}
+    return {"status": "ok", "version": "1.2.0"}
 
 
 @app.get("/ready", tags=["Sistema"])

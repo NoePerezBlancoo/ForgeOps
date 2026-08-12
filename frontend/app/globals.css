@@ -225,6 +225,10 @@ textarea.field {
   border-collapse: collapse;
 }
 
+.control-summary-table {
+  min-width: 560px;
+}
+
 .data-table th {
   border-bottom: 1px solid var(--line);
   background: #f8faf9;

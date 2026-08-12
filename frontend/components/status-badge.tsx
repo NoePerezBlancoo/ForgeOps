@@ -22,6 +22,12 @@ const tones: Record<string, string> = {
   READY: "badge-success",
   FAILED: "badge-danger",
   UNSUPPORTED: "badge-neutral",
+  TRIAL: "badge-info",
+  SUSPENDED: "badge-danger",
+  EXPIRED: "badge-danger",
+  INACTIVE: "badge-neutral",
+  PROFESSIONAL: "badge-success",
+  DEMO: "badge-warning",
 };
 
 export function StatusBadge({ value }: { value: string }) {

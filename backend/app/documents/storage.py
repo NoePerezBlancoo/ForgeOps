@@ -29,7 +29,7 @@ class LocalDocumentStorage:
         extension = Path(original_name).suffix.lower()
         if extension not in ALLOWED_EXTENSIONS:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Formato de archivo no permitido",
             )
 

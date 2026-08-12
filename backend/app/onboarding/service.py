@@ -137,7 +137,7 @@ def update_onboarding(
         step = payload.completed_step.strip().upper()
         if step not in MANUAL_STEPS:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="El paso no admite confirmacion manual",
             )
         completed.add(step)

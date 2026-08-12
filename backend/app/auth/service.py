@@ -59,6 +59,8 @@ def issue_session(db: Session, user: User, ip_address: str | None = None) -> tup
 def rotate_session(db: Session, refresh_token: str) -> tuple[User, str, str]:
     try:
         payload = decode_token(refresh_token, "refresh")
+        if payload.get("actor", "user") != "user":
+            raise ValueError("Tipo de sesion invalido")
         user_id = uuid.UUID(payload["sub"])
     except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc

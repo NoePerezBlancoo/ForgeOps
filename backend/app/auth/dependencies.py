@@ -32,6 +32,8 @@ def get_current_user(
     )
     try:
         payload = decode_token(token, "access")
+        if payload.get("actor", "user") != "user":
+            raise ValueError("Tipo de sesion invalido")
         user_id = uuid.UUID(payload["sub"])
     except (ValueError, TypeError):
         raise credentials_error from None

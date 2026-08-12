@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     secret_key: str = "development-key-change-before-deployment-2026"
     access_token_minutes: int = 15
     refresh_token_days: int = 7
+    operator_access_token_minutes: int = Field(default=10, ge=5, le=30)
+    operator_refresh_token_hours: int = Field(default=8, ge=1, le=24)
+    operator_lockout_attempts: int = Field(default=5, ge=3, le=10)
+    operator_lockout_minutes: int = Field(default=15, ge=1, le=60)
     trial_days: int = Field(default=30, ge=1, le=90)
     trial_signup_enabled: bool = True
     frontend_url: str = "http://localhost:3000"

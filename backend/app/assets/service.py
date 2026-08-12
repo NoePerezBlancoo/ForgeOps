@@ -19,7 +19,7 @@ def _plant_for_company(db: Session, company_id: uuid.UUID, plant_id: uuid.UUID) 
     )
     if not plant:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Planta no valida"
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Planta no valida"
         )
     return plant
 

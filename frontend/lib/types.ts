@@ -84,6 +84,99 @@ export interface UserOption {
   active: boolean;
 }
 
+export interface PlatformOperator {
+  id: string;
+  full_name: string;
+  email: string;
+  active: boolean;
+  mfa_enabled: boolean;
+  last_login_at: string | null;
+  password_changed_at: string | null;
+  created_at: string;
+}
+
+export interface OperatorCompanySummary {
+  id: string;
+  name: string;
+  email: string | null;
+  industry: string | null;
+  plan: CompanyPlan;
+  subscription_status: SubscriptionStatus;
+  access_status: AccessStatus;
+  trial_started_at: string | null;
+  trial_ends_at: string | null;
+  trial_days_remaining: number | null;
+  enabled_modules: CompanyModule[];
+  active: boolean;
+  created_at: string;
+  users_count: number;
+  plants_count: number;
+  assets_count: number;
+  open_incidents_count: number;
+  open_work_orders_count: number;
+  last_activity_at: string | null;
+}
+
+export interface OperatorCompanyDetail extends OperatorCompanySummary {
+  tax_id: string | null;
+  address: string | null;
+  phone: string | null;
+  timezone: string;
+  locale: string;
+  work_order_prefix: string;
+  updated_at: string;
+  administrators: Array<{
+    id: string;
+    full_name: string;
+    email: string;
+    active: boolean;
+    last_login_at: string | null;
+  }>;
+}
+
+export interface OperatorCompanyPage {
+  items: OperatorCompanySummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface OperatorDashboard {
+  total_companies: number;
+  active_trials: number;
+  expiring_trials: number;
+  expired_trials: number;
+  active_customers: number;
+  suspended_companies: number;
+  active_users: number;
+  total_assets: number;
+  open_incidents: number;
+  open_work_orders: number;
+  module_adoption: Record<CompanyModule, number>;
+  recent_companies: OperatorCompanySummary[];
+}
+
+export interface OperatorAuditEvent {
+  id: string;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  summary: string;
+  context: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
+  operator: Pick<PlatformOperator, "id" | "full_name" | "email"> | null;
+}
+
+export interface OperatorAuditPage {
+  items: OperatorAuditEvent[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
 export interface Plant {
   id: string;
   company_id: string;

@@ -93,6 +93,8 @@ Despues del primer acceso:
 - Revisa `/health` y `/ready` desde el monitor externo.
 - Centraliza los logs de contenedores y conserva `X-Request-ID` para diagnostico.
 - Revisa la auditoria administrativa y las sesiones activas.
+- Crea el operador propietario con `scripts.bootstrap_operator`, registra su MFA y conserva la clave TOTP en un gestor seguro.
+- Verifica que `/control` solo sea accesible por HTTPS y que la cuenta de operador no se comparta.
 - Ejecuta migraciones solo como parte de una version respaldada.
 - Actualiza dependencias mediante una rama y CI, nunca directamente en produccion.
 

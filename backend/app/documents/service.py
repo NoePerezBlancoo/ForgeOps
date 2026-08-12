@@ -74,18 +74,18 @@ async def create_document(
     )
     if not asset:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Activo no valido"
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Activo no valido"
         )
 
     content = await upload.read(settings.max_upload_bytes + 1)
     await upload.close()
     if not content:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Archivo vacio"
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Archivo vacio"
         )
     if len(content) > settings.max_upload_bytes:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail="El archivo supera el limite permitido",
         )
 

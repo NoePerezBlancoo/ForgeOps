@@ -2,9 +2,15 @@
 
 ForgeOps es una plataforma SaaS B2B para digitalizar el mantenimiento de pequenas y medianas empresas industriales. Sustituye hojas de calculo, papel y conversaciones dispersas por una operacion trazable sobre plantas, activos, incidencias, ordenes, preventivos, repuestos y documentacion tecnica.
 
-La V1.1 esta preparada para demostraciones comerciales autogestionadas y pilotos controlados. Cada evaluador puede crear un entorno privado durante 30 dias, seguir un tutorial integrado y activar solo los modulos que necesita su empresa.
+La V1.2 esta preparada para demostraciones comerciales autogestionadas y pilotos controlados. Cada evaluador puede crear un entorno privado durante 30 dias, mientras el propietario administra empresas y suscripciones desde un backoffice independiente con MFA.
 
-## Capacidades V1.1
+## Capacidades V1.2
+
+- Backoffice propietario en `/control`, separado de las cuentas de empresas.
+- Identidad global de operador, MFA TOTP obligatorio y bloqueo ante intentos fallidos.
+- Cartera de empresas con busqueda, estados comerciales, actividad y uso agregado.
+- Ampliacion de pruebas, activacion, suspension, modulos y disponibilidad por cliente.
+- Auditoria global de accesos y cambios comerciales con motivo, IP y valores anteriores.
 
 - Alta autogestionada de pruebas de 30 dias, con espacio multiempresa aislado.
 - Datos de ejemplo opcionales para empezar a evaluar el producto inmediatamente.
@@ -128,6 +134,8 @@ docker compose down -v
 /api/v1/ai                      indexacion y consultas documentales
 /api/v1/dashboard               KPIs y preparacion del piloto
 /api/v1/onboarding              progreso y tutorial integrado
+/api/v1/operator-auth           identidad y sesiones del propietario
+/api/v1/operator                backoffice global de empresas y plataforma
 ```
 
 ## Seguridad
@@ -147,6 +155,17 @@ docker compose down -v
 La suite cubre autenticacion, permisos, multiempresa, operaciones de mantenimiento, inventario, documentos, RAG, administracion, ultimo administrador, revocacion de sesiones, auditoria, filtros de planta, extraccion e idempotencia. GitHub Actions ejecuta Ruff, Pytest, ESLint, TypeScript y la build de Next.js en cada cambio.
 
 ## Gestion de pruebas
+
+Crear el primer operador del backoffice:
+
+```powershell
+$env:OPERATOR_BOOTSTRAP_NAME="ForgeOps Owner"
+$env:OPERATOR_BOOTSTRAP_EMAIL="owner@example.com"
+$env:OPERATOR_BOOTSTRAP_PASSWORD="UnaContrasenaSegura123!"
+docker compose exec backend python -m scripts.bootstrap_operator
+```
+
+El comando muestra una unica vez la clave y URI TOTP que se debe registrar en una aplicacion autenticadora. El acceso del propietario queda disponible en `http://localhost:3000/control/login`.
 
 Ampliar una prueba:
 
@@ -171,6 +190,7 @@ V1.1 incorpora aprovisionamiento automatizado de empresas y ciclo de prueba. Par
 - **V0.3:** ingesta documental y RAG verificable. Completada.
 - **V1.0:** administracion, seguridad, auditoria, contexto de planta y piloto comercial. Completada.
 - **V1.1:** prueba de 30 dias, onboarding guiado y configuracion modular. Completada.
+- **V1.2:** backoffice propietario, MFA, cartera de empresas y control comercial. Completada.
 - **Siguiente:** facturacion, correo transaccional, OPC UA, MQTT, ERP y observabilidad cloud.
 
 ## Licencia

@@ -1,6 +1,6 @@
 # Arquitectura de ForgeOps
 
-ForgeOps V1.1 es un monolito modular multiempresa con dos aplicaciones desplegables, almacenamiento documental privado y PostgreSQL con `pgvector`.
+ForgeOps V1.2 es un monolito modular multiempresa con dos aplicaciones desplegables, almacenamiento documental privado y PostgreSQL con `pgvector`.
 
 ```text
 Browser -> Next.js -> FastAPI -> PostgreSQL + pgvector
@@ -27,6 +27,7 @@ documents   archivos privados
 ai          ingesta, recuperacion y RAG
 dashboard   KPIs y onboarding
 onboarding  progreso individual y tutorial guiado
+operators   identidad propietaria y gobierno de plataforma
 ```
 
 ## Decisiones
@@ -44,6 +45,8 @@ onboarding  progreso individual y tutorial guiado
 - Suscripcion y modulos resueltos en el contexto de empresa, nunca desde el navegador.
 - Caducidad de pruebas evaluada en cada acceso y escritura bloqueada con HTTP 402.
 - Nucleo operativo siempre activo; modulos opcionales protegidos tanto en API como en UI.
+- Identidad de operador separada de usuarios tenant, con tokens, sesiones, cookie y auditoria propios.
+- MFA TOTP obligatorio para `/control`, codigos no reutilizables y bloqueo temporal por intentos.
 
 ## Modulos comerciales
 
@@ -54,6 +57,10 @@ El registro de prueba crea empresa, administrador y planta dentro de una unica t
 ## Limites de dominio
 
 Los servicios validan relaciones cruzadas antes de escribir: una orden no puede apuntar a un activo de otra planta, un responsable debe pertenecer a la empresa y un documento solo se recupera dentro de su tenant. Desactivar usuarios revoca sesiones; eliminar el ultimo administrador o desactivar una planta con activos se rechaza.
+
+## Plano de control
+
+`PlatformOperator` no tiene `company_id` y no reutiliza el rol `SUPER_ADMIN`. Su token declara el actor `operator`; las dependencias tenant rechazan esos tokens y las dependencias del backoffice rechazan tokens de clientes. El plano de control ofrece agregados comerciales y operativos, pero no rutas para leer incidencias, documentos o conocimiento de una empresa. Suspensiones, ampliaciones y cambios de modulos conservan operador, IP, motivo y estado anterior en `operator_audit_events`.
 
 ## Inteligencia documental
 
