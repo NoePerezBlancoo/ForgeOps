@@ -1,0 +1,47 @@
+name: Deploy staging
+
+on:
+  workflow_run:
+    workflows: ["Quality gate"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: railway-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      vars.RAILWAY_STAGING_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - run: npm install --global @railway/cli@5.37.7
+      - name: Deploy backend
+        run: railway up --service backend --environment staging --ci
+      - name: Deploy worker
+        run: railway up --service worker --environment staging --ci
+      - name: Deploy frontend
+        run: railway up --service frontend --environment staging --ci
+      - name: Validate staging
+        env:
+          STAGING_API_URL: ${{ vars.STAGING_API_URL }}
+          STAGING_APP_URL: ${{ vars.STAGING_APP_URL }}
+        run: |
+          curl --fail --silent --show-error "$STAGING_API_URL/ready"
+          curl --fail --silent --show-error "$STAGING_APP_URL/login" > /dev/null
