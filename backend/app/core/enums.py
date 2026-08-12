@@ -101,3 +101,11 @@ class DocumentIndexStatus(StrEnum):
     READY = "READY"
     FAILED = "FAILED"
     UNSUPPORTED = "UNSUPPORTED"
+
+
+class JobStatus(StrEnum):
+    PENDING = "PENDING"
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"

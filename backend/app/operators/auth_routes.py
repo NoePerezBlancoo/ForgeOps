@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.rate_limit import rate_limit
 from app.core.schemas import MessageResponse
 from app.operators.auth_service import (
     authenticate_operator,
@@ -33,11 +34,16 @@ def _set_operator_cookie(response: Response, token: str) -> None:
         httponly=True,
         secure=settings.cookie_secure,
         samesite="strict",
+        domain=settings.cookie_domain,
         path="/api/v1/operator-auth",
     )
 
 
-@router.post("/login", response_model=OperatorTokenResponse)
+@router.post(
+    "/login",
+    response_model=OperatorTokenResponse,
+    dependencies=[Depends(rate_limit("operator_login", "rate_limit_login"))],
+)
 def login(
     payload: OperatorLoginRequest,
     request: Request,
@@ -89,7 +95,13 @@ def logout(
     db: Session = Depends(get_db),
 ) -> MessageResponse:
     revoke_operator_session(db, cookie_token or (payload.refresh_token if payload else None))
-    response.delete_cookie(OPERATOR_REFRESH_COOKIE, path="/api/v1/operator-auth")
+    response.delete_cookie(
+        OPERATOR_REFRESH_COOKIE,
+        path="/api/v1/operator-auth",
+        domain=settings.cookie_domain,
+        secure=settings.cookie_secure,
+        samesite="strict",
+    )
     return MessageResponse(message="Sesion de operador cerrada")
 
 

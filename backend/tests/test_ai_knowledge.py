@@ -107,7 +107,13 @@ def test_unsupported_document_is_reported_and_viewer_cannot_index(client, tmp_pa
             "name": "Fotografia de placa",
             "type": "OTHER",
         },
-        files={"file": ("placa.png", b"not-a-real-image", "image/png")},
+        files={
+            "file": (
+                "placa.png",
+                b"\x89PNG\r\n\x1a\n" + b"valid-signature-test-payload",
+                "image/png",
+            )
+        },
     )
     assert uploaded.status_code == 201
 

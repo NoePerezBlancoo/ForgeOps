@@ -18,13 +18,32 @@ services:
       retries: 10
     restart: unless-stopped
 
+  redis:
+    image: redis:8.2-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - forgeops_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
     environment:
       APP_ENV: ${APP_ENV:-development}
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      ALLOW_DEMO_SEED: ${ALLOW_DEMO_SEED:-true}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-forgeops}:${POSTGRES_PASSWORD:-forgeops-local-only}@postgres:5432/${POSTGRES_DB:-forgeops}
+      DATABASE_POOL_MODE: ${DATABASE_POOL_MODE:-direct}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_REQUIRED: "true"
       SECRET_KEY: ${SECRET_KEY:-development-key-change-before-deployment-2026}
       ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
       REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-7}
@@ -35,7 +54,11 @@ services:
       TRIAL_DAYS: ${TRIAL_DAYS:-30}
       TRIAL_SIGNUP_ENABLED: ${TRIAL_SIGNUP_ENABLED:-true}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      API_URL: ${API_URL:-http://localhost:8000}
+      CONTROL_URL: ${CONTROL_URL:-http://localhost:3000/control}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-/app/uploads}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-15728640}
       AI_PROVIDER: ${AI_PROVIDER:-local}
@@ -52,9 +75,49 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+    entrypoint: ["python", "-m", "app.jobs.worker"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-forgeops}:${POSTGRES_PASSWORD:-forgeops-local-only}@postgres:5432/${POSTGRES_DB:-forgeops}
+      DATABASE_POOL_MODE: ${DATABASE_POOL_MODE:-direct}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_REQUIRED: "true"
+      SECRET_KEY: ${SECRET_KEY:-development-key-change-before-deployment-2026}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-/app/uploads}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-eu-west-1}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-development}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-no-reply@forgeops.local}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    volumes:
+      - forgeops_uploads:/app/uploads
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from app.core.redis import get_redis; assert get_redis().ping()"]
+      interval: 15s
       timeout: 5s
       retries: 10
     restart: unless-stopped
@@ -84,4 +147,5 @@ services:
 
 volumes:
   forgeops_postgres_data:
+  forgeops_redis_data:
   forgeops_uploads:

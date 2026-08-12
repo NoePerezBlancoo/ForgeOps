@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 from app.assets.models import Asset
 from app.auth.security import hash_password
 from app.companies.models import Company
+from app.core.config import settings
 from app.core.database import Base, get_db
 from app.core.enums import AssetStatus, Criticality, UserRole
 from app.main import app
@@ -26,6 +27,10 @@ TestingSession = sessionmaker(bind=test_engine, autoflush=False, expire_on_commi
 
 @pytest.fixture(autouse=True)
 def database() -> Generator[Session, None, None]:
+    rate_limit_enabled = settings.rate_limit_enabled
+    job_dispatch_enabled = settings.job_dispatch_enabled
+    settings.rate_limit_enabled = False
+    settings.job_dispatch_enabled = False
     Base.metadata.create_all(test_engine)
     db = TestingSession()
     seed_test_data(db)
@@ -41,6 +46,8 @@ def database() -> Generator[Session, None, None]:
     app.dependency_overrides.clear()
     db.close()
     Base.metadata.drop_all(test_engine)
+    settings.rate_limit_enabled = rate_limit_enabled
+    settings.job_dispatch_enabled = job_dispatch_enabled
 
 
 @pytest.fixture
