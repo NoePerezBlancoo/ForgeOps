@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "ForgeOps API"
     app_env: Literal["development", "testing", "staging", "production"] = "development"
-    app_version: str = "1.2.1"
+    app_version: str = "1.2.2"
     build_commit: str = "local"
     api_prefix: str = "/api/v1"
     api_url: str = "http://localhost:8000"
