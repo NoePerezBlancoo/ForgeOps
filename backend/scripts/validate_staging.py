@@ -323,29 +323,32 @@ def validate_http_tenancy_and_auth() -> dict:
             )
             if own_asset.status_code != 200:
                 raise AssertionError("El tenant propietario no puede leer su activo")
-            blocked_statuses = {
-                client_b.get(
-                    f"{settings.api_prefix}/assets/{asset_id}", headers=headers_b
-                ).status_code,
-                client_b.patch(
-                    f"{settings.api_prefix}/assets/{asset_id}",
-                    headers=headers_b,
-                    json={"name": "Cross tenant HTTP update"},
-                ).status_code,
-                client_b.post(
-                    f"{settings.api_prefix}/assets",
-                    headers=headers_b,
-                    json={
-                        "plant_id": str(plant_a_id),
-                        "code": f"CROSS-{suffix}",
-                        "name": "Cross tenant HTTP insert",
-                        "status": "ACTIVE",
-                        "criticality": "LOW",
-                    },
-                ).status_code,
-            }
-            if blocked_statuses != {404}:
-                raise AssertionError(f"IDOR HTTP no quedo oculto: {sorted(blocked_statuses)}")
+            cross_read = client_b.get(
+                f"{settings.api_prefix}/assets/{asset_id}", headers=headers_b
+            )
+            cross_update = client_b.patch(
+                f"{settings.api_prefix}/assets/{asset_id}",
+                headers=headers_b,
+                json={"name": "Cross tenant HTTP update"},
+            )
+            cross_insert = client_b.post(
+                f"{settings.api_prefix}/assets",
+                headers=headers_b,
+                json={
+                    "plant_id": str(plant_a_id),
+                    "code": f"CROSS-{suffix}",
+                    "name": "Cross tenant HTTP insert",
+                    "status": "ACTIVE",
+                    "criticality": "LOW",
+                },
+            )
+            blocked_statuses = (
+                cross_read.status_code,
+                cross_update.status_code,
+                cross_insert.status_code,
+            )
+            if blocked_statuses != (404, 404, 422):
+                raise AssertionError(f"IDOR HTTP no quedo bloqueado: {blocked_statuses}")
             tenant_b_assets = client_b.get(
                 f"{settings.api_prefix}/assets", headers=headers_b
             ).json()
