@@ -12,6 +12,16 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class Page[T](BaseModel):
+    items: list[T]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+    sort: str
+    filters: dict[str, str | bool]
+
+
 class UserSummary(ORMModel):
     id: UUID
     full_name: str

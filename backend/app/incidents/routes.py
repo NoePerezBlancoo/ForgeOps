@@ -1,4 +1,5 @@
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -6,8 +7,15 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user, require_roles
 from app.core.database import get_db
 from app.core.enums import IncidentStatus, Priority, UserRole
+from app.core.schemas import Page
 from app.incidents.schemas import IncidentCreate, IncidentRead, IncidentUpdate
-from app.incidents.service import create_incident, get_incident, list_incidents, update_incident
+from app.incidents.service import (
+    create_incident,
+    get_incident,
+    list_incidents,
+    page_incidents,
+    update_incident,
+)
 from app.users.models import User
 
 router = APIRouter(prefix="/incidents", tags=["Incidencias"])
@@ -27,6 +35,31 @@ def index(
 ) -> list:
     return list_incidents(
         db, current_user.company_id, search, incident_status, priority, plant_id
+    )
+
+
+@router.get("/page", response_model=Page[IncidentRead])
+def paginated_index(
+    search: str | None = Query(default=None, max_length=100),
+    incident_status: IncidentStatus | None = Query(default=None, alias="status"),
+    priority: Priority | None = None,
+    plant_id: uuid.UUID | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=10, le=100),
+    sort: Literal["reported", "priority", "title"] = "reported",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Page[IncidentRead]:
+    return page_incidents(
+        db,
+        current_user.company_id,
+        search,
+        incident_status,
+        priority,
+        plant_id,
+        page,
+        page_size,
+        sort,
     )
 
 

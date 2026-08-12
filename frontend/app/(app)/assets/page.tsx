@@ -1,16 +1,19 @@
 "use client";
 
 import { Pencil, Plus, Search, SlidersHorizontal } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useDeferredValue, useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorBanner, LoadingBlock } from "@/components/feedback";
 import { Modal } from "@/components/modal";
 import { PageHeader } from "@/components/page-header";
+import { PaginationBar } from "@/components/pagination-bar";
 import { StatusBadge } from "@/components/status-badge";
 import { useWorkspace } from "@/components/workspace-provider";
 import { ApiError } from "@/lib/api";
-import type { Asset, AssetStatus, Criticality, Plant } from "@/lib/types";
+import type { Asset, AssetStatus, Criticality, Paginated, Plant } from "@/lib/types";
+
+const PAGE_SIZE = 25;
 
 interface AssetForm {
   plant_id: string;
@@ -45,50 +48,51 @@ const emptyForm: AssetForm = {
 export default function AssetsPage() {
   const { request, user } = useAuth();
   const { scopedPath } = useWorkspace();
-  const [assets, setAssets] = useState<Asset[]>([]);
+  const [pageData, setPageData] = useState<Paginated<Asset> | null>(null);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Asset | null>(null);
   const [form, setForm] = useState<AssetForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const deferredSearch = useDeferredValue(search);
 
   const canManage = user && ["SUPER_ADMIN", "ADMIN", "MAINTENANCE_MANAGER"].includes(user.role);
 
-  const loadData = useCallback(async () => {
+  const loadAssets = useCallback(async () => {
     setLoading(true);
     setError("");
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(PAGE_SIZE),
+      sort: "code",
+    });
+    if (deferredSearch.trim()) params.set("search", deferredSearch.trim());
+    if (statusFilter) params.set("status", statusFilter);
     try {
-      const [assetData, plantData] = await Promise.all([
-        request<Asset[]>(scopedPath("/assets")),
-        request<Plant[]>("/plants"),
-      ]);
-      setAssets(assetData);
-      setPlants(plantData);
+      setPageData(await request<Paginated<Asset>>(scopedPath(`/assets/page?${params}`)));
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "No se pudieron cargar los activos");
     } finally {
       setLoading(false);
     }
-  }, [request, scopedPath]);
+  }, [deferredSearch, page, request, scopedPath, statusFilter]);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void loadAssets();
+  }, [loadAssets]);
 
-  const filteredAssets = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return assets.filter((asset) => {
-      const matchesTerm = !term || [asset.code, asset.name, asset.location, asset.manufacturer]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(term));
-      const matchesStatus = !statusFilter || asset.status === statusFilter;
-      return matchesTerm && matchesStatus;
-    });
-  }, [assets, search, statusFilter]);
+  useEffect(() => {
+    void request<Plant[]>("/plants")
+      .then(setPlants)
+      .catch((requestError) => setError(requestError instanceof ApiError ? requestError.message : "No se pudieron cargar las plantas"));
+  }, [request]);
+
+  const assets = pageData?.items ?? [];
 
   function openCreate() {
     setEditing(null);
@@ -128,7 +132,7 @@ export default function AssetsPage() {
         body: JSON.stringify(payload),
       });
       setModalOpen(false);
-      await loadData();
+      await loadAssets();
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "No se pudo guardar el activo");
     } finally {
@@ -147,11 +151,11 @@ export default function AssetsPage() {
       <section className="panel mb-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
         <label className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={17} />
-          <input className="field field-with-icon" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por codigo, activo, ubicacion o fabricante" />
+          <input className="field field-with-icon" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar por codigo, activo, ubicacion o fabricante" />
         </label>
         <label className="relative sm:w-52">
           <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={16} />
-          <select className="field field-with-icon" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <select className="field field-with-icon" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}>
             <option value="">Todos los estados</option>
             <option value="ACTIVE">Activos</option>
             <option value="STOPPED">Parados</option>
@@ -163,12 +167,12 @@ export default function AssetsPage() {
 
       {loading ? <LoadingBlock /> : (
         <section className="panel overflow-hidden">
-          {filteredAssets.length === 0 ? <EmptyState title="No hay activos coincidentes" detail="Ajusta los filtros o registra un nuevo equipo." /> : (
+          {assets.length === 0 ? <EmptyState title="No hay activos coincidentes" detail="Ajusta los filtros o registra un nuevo equipo." /> : (
             <div className="table-wrap">
               <table className="data-table">
                 <thead><tr><th>Activo</th><th>Equipo</th><th>Ubicacion</th><th>Criticidad</th><th>Estado</th><th className="w-16">Accion</th></tr></thead>
                 <tbody>
-                  {filteredAssets.map((asset) => (
+                  {assets.map((asset) => (
                     <tr key={asset.id}>
                       <td><p className="font-bold text-[var(--ink)]">{asset.code}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{asset.plant.name}</p></td>
                       <td><p className="font-semibold text-[var(--ink)]">{asset.name}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{[asset.manufacturer, asset.model].filter(Boolean).join(" · ") || "Sin fabricante"}</p></td>
@@ -182,6 +186,7 @@ export default function AssetsPage() {
               </table>
             </div>
           )}
+          {pageData && <PaginationBar noun="activos" page={pageData.page} pages={pageData.pages} total={pageData.total} onPageChange={setPage} />}
         </section>
       )}
 

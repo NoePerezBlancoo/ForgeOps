@@ -1,17 +1,20 @@
 "use client";
 
 import { CalendarDays, PlayCircle, Plus, Search, Settings2 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useDeferredValue, useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorBanner, LoadingBlock } from "@/components/feedback";
 import { Modal } from "@/components/modal";
 import { PageHeader } from "@/components/page-header";
+import { PaginationBar } from "@/components/pagination-bar";
 import { StatusBadge } from "@/components/status-badge";
 import { useWorkspace } from "@/components/workspace-provider";
 import { ApiError } from "@/lib/api";
 import { formatDate, labelFor } from "@/lib/format";
-import type { Asset, Priority, UserOption, WorkOrder, WorkOrderStatus, WorkOrderType } from "@/lib/types";
+import type { Asset, Paginated, Priority, UserOption, WorkOrder, WorkOrderStatus, WorkOrderType } from "@/lib/types";
+
+const PAGE_SIZE = 25;
 
 interface CreateForm {
   asset_id: string;
@@ -48,52 +51,62 @@ const emptyCreate: CreateForm = {
 export default function WorkOrdersPage() {
   const { request, user } = useAuth();
   const { scopedPath } = useWorkspace();
-  const [orders, setOrders] = useState<WorkOrder[]>([]);
+  const [pageData, setPageData] = useState<Paginated<WorkOrder> | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [selected, setSelected] = useState<WorkOrder | null>(null);
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate);
   const [manageForm, setManageForm] = useState<ManageForm | null>(null);
   const [saving, setSaving] = useState(false);
+  const deferredSearch = useDeferredValue(search);
 
   const canCreate = user && ["SUPER_ADMIN", "ADMIN", "MAINTENANCE_MANAGER"].includes(user.role);
   const canManage = user && user.role !== "VIEWER";
   const isTechnician = user?.role === "TECHNICIAN";
 
-  const loadData = useCallback(async () => {
+  const loadOrders = useCallback(async () => {
     setLoading(true);
     setError("");
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(PAGE_SIZE),
+      sort: "created",
+    });
+    if (deferredSearch.trim()) params.set("search", deferredSearch.trim());
+    if (statusFilter) params.set("status", statusFilter);
     try {
-      const [orderData, assetData, userData] = await Promise.all([
-        request<WorkOrder[]>(scopedPath("/work-orders")),
-        request<Asset[]>(scopedPath("/assets")),
-        request<UserOption[]>("/users/options"),
-      ]);
-      setOrders(orderData);
-      setAssets(assetData);
-      setUsers(userData.filter((item) => ["TECHNICIAN", "MAINTENANCE_MANAGER", "ADMIN"].includes(item.role)));
+      setPageData(await request<Paginated<WorkOrder>>(scopedPath(`/work-orders/page?${params}`)));
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "No se pudieron cargar las ordenes");
     } finally {
       setLoading(false);
     }
+  }, [deferredSearch, page, request, scopedPath, statusFilter]);
+
+  const loadOptions = useCallback(async () => {
+    try {
+      const [assetData, userData] = await Promise.all([
+        request<Asset[]>(scopedPath("/assets")),
+        request<UserOption[]>("/users/options"),
+      ]);
+      setAssets(assetData);
+      setUsers(userData.filter((item) => ["TECHNICIAN", "MAINTENANCE_MANAGER", "ADMIN"].includes(item.role)));
+    } catch (requestError) {
+      setError(requestError instanceof ApiError ? requestError.message : "No se pudieron cargar las opciones de asignacion");
+    }
   }, [request, scopedPath]);
 
-  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => { void loadOrders(); }, [loadOrders]);
+  useEffect(() => { void loadOptions(); }, [loadOptions]);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return orders.filter((order) => {
-      const matchesSearch = !term || [order.number, order.title, order.asset.code, order.asset.name].some((value) => value.toLowerCase().includes(term));
-      return matchesSearch && (!statusFilter || order.status === statusFilter);
-    });
-  }, [orders, search, statusFilter]);
+  const orders = pageData?.items ?? [];
 
   function openCreate() {
     setCreateForm({ ...emptyCreate, asset_id: assets[0]?.id ?? "" });
@@ -132,7 +145,7 @@ export default function WorkOrdersPage() {
         }),
       });
       setCreateOpen(false);
-      await loadData();
+      await loadOrders();
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "No se pudo crear la orden");
     } finally {
@@ -160,7 +173,7 @@ export default function WorkOrdersPage() {
     try {
       await request(`/work-orders/${selected.id}`, { method: "PATCH", body: JSON.stringify(payload) });
       setManageOpen(false);
-      await loadData();
+      await loadOrders();
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "No se pudo actualizar la orden");
     } finally {
@@ -177,17 +190,17 @@ export default function WorkOrdersPage() {
       />
       {error && <ErrorBanner message={error} />}
       <section className="panel mb-4 flex flex-col gap-3 p-3 sm:flex-row">
-        <label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={17} /><input className="field field-with-icon" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por numero, tarea, activo o codigo" /></label>
-        <select className="field sm:w-52" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">Todos los estados</option><option value="OPEN">Abiertas</option><option value="ASSIGNED">Asignadas</option><option value="IN_PROGRESS">En curso</option><option value="WAITING">En espera</option><option value="COMPLETED">Completadas</option><option value="CANCELLED">Canceladas</option></select>
+        <label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={17} /><input className="field field-with-icon" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar por numero, tarea, activo o codigo" /></label>
+        <select className="field sm:w-52" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}><option value="">Todos los estados</option><option value="OPEN">Abiertas</option><option value="ASSIGNED">Asignadas</option><option value="IN_PROGRESS">En curso</option><option value="WAITING">En espera</option><option value="COMPLETED">Completadas</option><option value="CANCELLED">Canceladas</option></select>
       </section>
 
       {loading ? <LoadingBlock /> : (
         <section className="panel overflow-hidden">
-          {filtered.length === 0 ? <EmptyState title="No hay ordenes coincidentes" detail="Ajusta los filtros o planifica una nueva intervencion." /> : (
+          {orders.length === 0 ? <EmptyState title="No hay ordenes coincidentes" detail="Ajusta los filtros o planifica una nueva intervencion." /> : (
             <div className="table-wrap">
               <table className="data-table">
                 <thead><tr><th>Orden</th><th>Trabajo</th><th>Activo</th><th>Tipo</th><th>Prioridad</th><th>Estado</th><th>Planificada</th><th className="w-16">Accion</th></tr></thead>
-                <tbody>{filtered.map((order) => (
+                <tbody>{orders.map((order) => (
                   <tr key={order.id}>
                     <td><p className="font-bold text-[var(--accent)]">{order.number}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{order.assignee?.full_name ?? "Sin asignar"}</p></td>
                     <td className="max-w-70"><p className="truncate font-semibold text-[var(--ink)]">{order.title}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{order.estimated_duration ? `${order.estimated_duration} min estimados` : "Sin estimacion"}</p></td>
@@ -202,6 +215,7 @@ export default function WorkOrdersPage() {
               </table>
             </div>
           )}
+          {pageData && <PaginationBar noun="ordenes" page={pageData.page} pages={pageData.pages} total={pageData.total} onPageChange={setPage} />}
         </section>
       )}
 

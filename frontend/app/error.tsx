@@ -1,9 +1,9 @@
 "use client";
 
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, Home, RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 
-export default function ErrorPage({
+export default function ApplicationError({
   error,
   reset,
 }: {
@@ -11,20 +11,33 @@ export default function ErrorPage({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    console.error("ForgeOps UI error", { digest: error.digest });
   }, [error]);
 
   return (
-    <section className="panel mx-auto max-w-xl p-7 text-center">
-      <AlertTriangle className="mx-auto text-[var(--warning)]" size={34} />
-      <h2 className="mt-4 text-xl font-bold">No se pudo cargar esta vista</h2>
-      <p className="mt-2 text-sm text-[var(--muted)]">
-        Tus datos no se han modificado. Reintenta la operacion o facilita la referencia a soporte.
-      </p>
-      {error.digest && <p className="mt-3 font-mono text-[11px] text-[var(--muted)]">Ref. {error.digest}</p>}
-      <button className="button-primary mx-auto mt-5" onClick={reset}>
-        <RefreshCw size={17} /> Reintentar
-      </button>
-    </section>
+    <main className="grid min-h-screen place-items-center bg-[var(--canvas)] px-5 py-10">
+      <section className="w-full max-w-md rounded-md border border-[var(--line)] bg-white p-6 shadow-sm sm:p-8">
+        <div className="mb-5 grid size-11 place-items-center rounded-md bg-red-50 text-red-700">
+          <AlertTriangle size={22} />
+        </div>
+        <h1 className="text-xl font-bold text-[var(--ink)]">No se pudo cargar esta vista</h1>
+        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+          La operacion no se ha completado. Puedes volver a intentarlo o regresar al panel.
+        </p>
+        {error.digest && (
+          <p className="mt-4 rounded-md bg-[var(--canvas)] px-3 py-2 font-mono text-xs text-[var(--muted)]">
+            Referencia: {error.digest}
+          </p>
+        )}
+        <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+          <button className="button-primary justify-center" onClick={reset}>
+            <RefreshCw size={16} /> Reintentar
+          </button>
+          <a className="button-secondary justify-center" href="/dashboard">
+            <Home size={16} /> Ir al panel
+          </a>
+        </div>
+      </section>
+    </main>
   );
 }
