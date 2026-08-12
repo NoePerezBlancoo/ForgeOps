@@ -29,8 +29,12 @@ services:
       REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-7}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-/app/uploads}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-15728640}
     ports:
       - "8000:8000"
+    volumes:
+      - forgeops_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,4 +66,4 @@ services:
 
 volumes:
   forgeops_postgres_data:
-
+  forgeops_uploads:

@@ -1,68 +1,53 @@
 # ForgeOps
 
-ForgeOps es una plataforma SaaS B2B para digitalizar la gestión de mantenimiento en pequeñas y medianas empresas industriales. Centraliza activos, incidencias, órdenes de trabajo y KPIs operativos con aislamiento multiempresa y una experiencia diseñada para responsables de mantenimiento y técnicos de planta.
+ForgeOps es una plataforma SaaS B2B para digitalizar el mantenimiento de pequenas y medianas empresas industriales. Centraliza activos, incidencias, ordenes de trabajo, mantenimiento preventivo, repuestos, documentacion tecnica y KPIs operativos con aislamiento multiempresa.
 
-La V0.1 es un MVP funcional: no es un ERP ni una maqueta estática. Incluye API REST, autenticación segura, permisos, base de datos migrada, datos de demostración idempotentes, interfaz operativa y pruebas automatizadas.
+La V0.2 es una aplicacion funcional, no una maqueta estatica. Incluye API REST, autenticacion segura, permisos por rol, migraciones, datos demo idempotentes, almacenamiento documental privado, interfaz responsive y pruebas automatizadas.
 
-## Funcionalidad disponible
+## Funcionalidad
 
 - Login con access token JWT y refresh token rotatorio en cookie `HttpOnly`.
-- Aislamiento lógico por empresa mediante `company_id`.
+- Aislamiento logico por empresa mediante `company_id`.
 - Roles `SUPER_ADMIN`, `ADMIN`, `MAINTENANCE_MANAGER`, `TECHNICIAN` y `VIEWER`.
-- Catálogo de empresas, plantas y usuarios para el contexto autenticado.
-- Gestión de activos con estado, criticidad, ubicación y datos técnicos.
-- Registro y seguimiento de incidencias, responsables, parada, causa raíz y resolución.
-- Creación y ejecución de órdenes de trabajo correctivas, preventivas, de inspección y mejora.
-- Dashboard con disponibilidad, carga de trabajo, incidencias críticas y horas de parada.
-- Swagger/OpenAPI, migraciones Alembic, carga demo y pruebas de seguridad funcional.
-- Interfaz responsive para escritorio y tablet.
+- Empresas, plantas, usuarios y activos industriales.
+- Incidencias con prioridad, responsable, parada, causa raiz y resolucion.
+- Ordenes correctivas, preventivas, de inspeccion y mejora.
+- Planes preventivos recurrentes con generacion controlada de ordenes.
+- Inventario de repuestos con stock minimo y movimientos inmutables.
+- Documentos tecnicos privados vinculados a activos y descarga autenticada.
+- Dashboard con disponibilidad, carga, paradas, preventivos y alertas de stock.
+- Swagger/OpenAPI, Alembic, semilla demo y GitHub Actions.
 
-## Arquitectura
+## Stack
 
 ```text
-industrial-maintenance-ai-saas/
-├── backend/        FastAPI, SQLAlchemy, Pydantic y Alembic
-├── frontend/       Next.js, React, TypeScript y Tailwind CSS
-├── docker/         Notas de infraestructura
-├── docs/           Decisiones de arquitectura
-└── docker-compose.yml
+Frontend    Next.js 16, React 19, TypeScript, Tailwind CSS
+Backend     FastAPI, SQLAlchemy 2, Pydantic 2, Alembic
+Datos       PostgreSQL 17
+Ejecucion   Docker Compose
 ```
 
-El backend es un monolito modular. Cada dominio mantiene modelos, esquemas, servicios y rutas independientes. Los directorios `ai` e `integrations` contienen únicamente contratos de extensión; no simulan IA ni conexiones industriales inexistentes.
+El backend es un monolito modular. Cada dominio mantiene sus modelos, esquemas, servicios y rutas. Los modulos `ai` e `integrations` contienen contratos de extension y no simulan capacidades todavia inexistentes.
 
 Consulta [docs/architecture.md](docs/architecture.md) para las decisiones principales.
 
-## Requisitos
-
-- Docker Desktop con Docker Compose.
-- Puertos locales libres: `3000`, `8000` y `5432`.
-
-No es necesario instalar Python, Node.js ni PostgreSQL en el equipo anfitrión.
-
 ## Puesta en marcha
 
-1. Crea el archivo de entorno local:
+Requisitos: Docker Desktop y los puertos `3000`, `8000` y `5432` disponibles.
 
 ```powershell
 Copy-Item .env.example .env
+docker compose up -d --build
 ```
 
-2. Sustituye `POSTGRES_PASSWORD` y `SECRET_KEY` en `.env` antes de exponer el sistema fuera del equipo local.
+Servicios:
 
-3. Construye y arranca todos los servicios:
-
-```powershell
-docker compose up --build
-```
-
-4. Abre los servicios:
-
-- Aplicación: http://localhost:3000
+- Aplicacion: http://localhost:3000
 - API: http://localhost:8000
 - Swagger: http://localhost:8000/docs
 - OpenAPI: http://localhost:8000/api/v1/openapi.json
 
-El backend aplica las migraciones y prepara los datos demo automáticamente. La carga puede repetirse sin duplicar activos, incidencias ni órdenes.
+El backend aplica las migraciones y prepara los datos demo automaticamente. La semilla puede ejecutarse repetidamente sin duplicar registros.
 
 ## Credenciales demo
 
@@ -72,7 +57,7 @@ Password: Admin123!
 Rol:      ADMIN
 ```
 
-Estas credenciales son públicas y solo sirven para desarrollo y demostración.
+Estas credenciales solo deben utilizarse para desarrollo y demostracion.
 
 ## Comandos habituales
 
@@ -88,56 +73,56 @@ docker compose exec frontend npm run typecheck
 docker compose down
 ```
 
-Para eliminar también los datos locales de PostgreSQL:
+Para reiniciar tambien los datos locales:
 
 ```powershell
 docker compose down -v
 ```
 
-## API V0.1
+## API V0.2
 
 ```text
 POST  /api/v1/auth/login
 POST  /api/v1/auth/refresh
 POST  /api/v1/auth/logout
 GET   /api/v1/auth/me
-GET   /api/v1/companies/current
-GET   /api/v1/plants
-GET   /api/v1/users
+
 GET   /api/v1/assets
-POST  /api/v1/assets
-PATCH /api/v1/assets/{id}
 GET   /api/v1/incidents
-POST  /api/v1/incidents
-PATCH /api/v1/incidents/{id}
 GET   /api/v1/work-orders
-POST  /api/v1/work-orders
-PATCH /api/v1/work-orders/{id}
 GET   /api/v1/dashboard
+
+GET   /api/v1/preventive-maintenance
+POST  /api/v1/preventive-maintenance
+PATCH /api/v1/preventive-maintenance/{id}
+POST  /api/v1/preventive-maintenance/{id}/generate-work-order
+POST  /api/v1/preventive-maintenance/actions/generate-due
+
+GET   /api/v1/inventory
+POST  /api/v1/inventory
+PATCH /api/v1/inventory/{id}
+GET   /api/v1/inventory/{id}/movements
+POST  /api/v1/inventory/{id}/movements
+
+GET    /api/v1/documents
+POST   /api/v1/documents
+GET    /api/v1/documents/{id}/download
+PATCH  /api/v1/documents/{id}
+DELETE /api/v1/documents/{id}
 ```
 
-## Pruebas
+## Calidad
 
-La suite cubre:
-
-- autenticación correcta e incorrecta;
-- denegación de escritura al rol de consulta;
-- aislamiento de activos entre dos empresas;
-- creación de activos;
-- creación y asignación de incidencias;
-- creación y asignación de órdenes de trabajo.
-
-El workflow de GitHub Actions ejecuta lint, pruebas, typecheck y build en cada `push` o `pull request`.
+La suite cubre autenticacion, permisos, aislamiento entre empresas, activos, incidencias, ordenes, preventivos sin duplicar ordenes pendientes, stock no negativo y privacidad documental. El workflow ejecuta lint, pruebas, typecheck y build en cada `push` y `pull request`.
 
 ## Hoja de ruta
 
-- **V0.1:** activos, incidencias, órdenes de trabajo y dashboard.
-- **V0.2:** preventivos, inventario, consumos y documentos técnicos.
+- **V0.1:** activos, incidencias, ordenes de trabajo y dashboard. Completada.
+- **V0.2:** preventivos, inventario, movimientos y documentos tecnicos. Completada.
 - **V0.3:** ingesta documental, embeddings y RAG con fuentes verificables.
 - **V0.4:** adaptadores OPC UA, MQTT, Modbus TCP, ERP y bases externas.
-- **V1.0:** auditoría, observabilidad, backups, almacenamiento cloud y piloto real.
+- **V1.0:** auditoria, observabilidad, backups, almacenamiento cloud y piloto real.
 
 ## Licencia
 
 Distribuido bajo licencia MIT. Consulta [LICENSE](LICENSE).
-

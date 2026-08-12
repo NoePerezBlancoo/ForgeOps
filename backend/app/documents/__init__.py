@@ -1,1 +1,1 @@
-"""Modulo reservado para metadatos y almacenamiento documental en V0.2."""
+"""Technical document management and protected local storage."""

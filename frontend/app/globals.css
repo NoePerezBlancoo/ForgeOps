@@ -244,6 +244,19 @@ textarea.field {
   background: #fafcfb;
 }
 
+.document-table {
+  min-width: 850px;
+  table-layout: fixed;
+}
+
+.document-table th:nth-child(1) { width: 25%; }
+.document-table th:nth-child(2) { width: 14%; }
+.document-table th:nth-child(3) { width: 10%; }
+.document-table th:nth-child(4) { width: 17%; }
+.document-table th:nth-child(5) { width: 11%; }
+.document-table th:nth-child(6) { width: 11%; }
+.document-table th:nth-child(7) { width: 12%; }
+
 .status-badge {
   display: inline-flex;
   min-height: 23px;
@@ -261,6 +274,17 @@ textarea.field {
 .badge-orange { background: #fff0e4; color: #a44e0a; }
 .badge-info { background: #e2f2f3; color: #086c72; }
 .badge-neutral { background: #edf0ef; color: #566365; }
+
+.notice-success {
+  margin-bottom: 16px;
+  border: 1px solid #b8dfcb;
+  border-radius: 5px;
+  background: #eaf7f0;
+  padding: 11px 14px;
+  color: #176844;
+  font-size: 13px;
+  font-weight: 700;
+}
 
 .loader {
   display: inline-block;

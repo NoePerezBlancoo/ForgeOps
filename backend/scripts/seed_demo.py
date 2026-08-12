@@ -9,13 +9,20 @@ from app.core.database import SessionLocal
 from app.core.enums import (
     AssetStatus,
     Criticality,
+    DocumentType,
+    FrequencyType,
     IncidentStatus,
+    InventoryMovementType,
     Priority,
     UserRole,
     WorkOrderStatus,
     WorkOrderType,
 )
+from app.documents.models import TechnicalDocument
+from app.documents.storage import LocalDocumentStorage
 from app.incidents.models import Incident
+from app.inventory.models import InventoryItem, InventoryMovement
+from app.maintenance.models import PreventivePlan
 from app.models import *  # noqa: F403
 from app.plants.models import Plant
 from app.users.models import User
@@ -544,6 +551,161 @@ def get_or_create_work_orders(db, company, plant, assets, users, incidents) -> N
         )
 
 
+def get_or_create_preventive_plans(db, company, assets, users) -> None:
+    now = datetime.now(UTC)
+    definitions = [
+        ("Lubricacion y geometria mensual", 0, FrequencyType.MONTHS, 1, -2, 90, Priority.HIGH),
+        ("Revision de filtros y aceite", 5, FrequencyType.MONTHS, 3, 8, 120, Priority.HIGH),
+        (
+            "Inspeccion de seguridad perimetral",
+            3,
+            FrequencyType.WEEKS,
+            2,
+            -1,
+            45,
+            Priority.CRITICAL,
+        ),
+        ("Verificacion electrica anual", 6, FrequencyType.YEARS, 1, 28, 180, Priority.MEDIUM),
+        ("Analisis de vibraciones", 9, FrequencyType.MONTHS, 1, 5, 75, Priority.HIGH),
+    ]
+    for index, (name, asset_index, frequency, value, day_offset, duration, priority) in enumerate(
+        definitions
+    ):
+        exists = db.scalar(
+            select(PreventivePlan).where(
+                PreventivePlan.company_id == company.id,
+                PreventivePlan.asset_id == assets[asset_index].id,
+                PreventivePlan.name == name,
+            )
+        )
+        if exists:
+            continue
+        db.add(
+            PreventivePlan(
+                company_id=company.id,
+                asset_id=assets[asset_index].id,
+                assigned_to=users["tech1" if index % 2 == 0 else "tech2"].id,
+                name=name,
+                description=(
+                    f"Intervencion preventiva estandarizada sobre {assets[asset_index].name}, "
+                    "incluyendo inspeccion, mediciones y registro del resultado."
+                ),
+                frequency_type=frequency,
+                frequency_value=value,
+                next_execution=now + timedelta(days=day_offset),
+                estimated_duration=duration,
+                priority=priority,
+                active=True,
+            )
+        )
+
+
+def get_or_create_inventory(db, company, users) -> None:
+    definitions = [
+        ("ROD-6205", "Rodamiento 6205-2RS", 8, 4, "ud", "A-01-02", 18.5),
+        ("FILT-GA55", "Filtro de aceite GA55", 2, 3, "ud", "A-02-01", 64.9),
+        ("SENS-M18", "Sensor inductivo M18 PNP", 5, 4, "ud", "B-01-03", 32.75),
+        ("CONT-24V", "Contactor 24 VDC 18A", 1, 2, "ud", "B-02-02", 41.2),
+        ("ACE-H46", "Aceite hidraulico ISO VG46", 75, 40, "l", "LIQ-01", 4.35),
+        ("GRAS-EP2", "Grasa multiproposito EP2", 12, 6, "kg", "LIQ-02", 8.8),
+        ("CORR-A42", "Correa trapezoidal A42", 3, 3, "ud", "A-03-04", 14.1),
+        ("FUS-10A", "Fusible cilindrico 10A", 20, 10, "ud", "B-03-01", 1.45),
+        ("RAC-12", "Racor neumatico recto 12 mm", 6, 8, "ud", "C-01-02", 6.25),
+        ("VAL-532", "Electrovalvula 5/3 24VDC", 1, 2, "ud", "C-02-01", 89.0),
+    ]
+    for code, name, stock, minimum, unit, location, cost in definitions:
+        item = db.scalar(
+            select(InventoryItem).where(
+                InventoryItem.company_id == company.id, InventoryItem.code == code
+            )
+        )
+        if item:
+            continue
+        item = InventoryItem(
+            company_id=company.id,
+            code=code,
+            name=name,
+            description="Repuesto homologado para los equipos de la planta de Ourense.",
+            stock=stock,
+            minimum_stock=minimum,
+            unit=unit,
+            location=location,
+            cost=cost,
+            active=True,
+        )
+        db.add(item)
+        db.flush()
+        db.add(
+            InventoryMovement(
+                company_id=company.id,
+                item_id=item.id,
+                user_id=users["manager"].id,
+                movement_type=InventoryMovementType.RECEIPT,
+                quantity=stock,
+                resulting_stock=stock,
+                reason="Inventario inicial validado",
+            )
+        )
+
+
+def get_or_create_documents(db, company, assets, users) -> None:
+    storage = LocalDocumentStorage()
+    definitions = [
+        (
+            "Procedimiento de bloqueo y consignacion",
+            0,
+            DocumentType.SAFETY,
+            "procedimiento_loto_cnc.txt",
+            "PROCEDIMIENTO LOTO\n\n1. Detener el equipo.\n"
+            "2. Aislar todas las energias.\n"
+            "3. Verificar ausencia de energia.\n"
+            "4. Registrar y liberar la intervencion.\n",
+        ),
+        (
+            "Plan de lubricacion del compresor",
+            5,
+            DocumentType.PROCEDURE,
+            "plan_lubricacion_compresor.txt",
+            "PLAN DE LUBRICACION\n\nRevisar nivel, fugas, presion diferencial y "
+            "estado del aceite. Registrar valores y desviaciones en la orden.\n",
+        ),
+        (
+            "Referencia de diagnostico del robot",
+            3,
+            DocumentType.MANUAL,
+            "diagnostico_robot_soldadura.txt",
+            "GUIA DE DIAGNOSTICO\n\nComprobar alarmas activas, estado del bus de campo, "
+            "seguridades y referencias de ejes antes del rearme.\n",
+        ),
+    ]
+    for name, asset_index, document_type, filename, content in definitions:
+        exists = db.scalar(
+            select(TechnicalDocument).where(
+                TechnicalDocument.company_id == company.id,
+                TechnicalDocument.asset_id == assets[asset_index].id,
+                TechnicalDocument.name == name,
+            )
+        )
+        if exists:
+            continue
+        encoded = content.encode("utf-8")
+        key = storage.store(company.id, filename, encoded)
+        db.add(
+            TechnicalDocument(
+                company_id=company.id,
+                asset_id=assets[asset_index].id,
+                uploaded_by=users["manager"].id,
+                name=name,
+                type=document_type,
+                storage_key=key,
+                original_name=filename,
+                mime_type="text/plain; charset=utf-8",
+                file_size=len(encoded),
+                description="Documento tecnico controlado para uso del equipo de mantenimiento.",
+            )
+        )
+
+
 def seed() -> None:
     with SessionLocal() as db:
         company = get_or_create_company(db)
@@ -552,6 +714,9 @@ def seed() -> None:
         assets = get_or_create_assets(db, company, plant)
         incidents = get_or_create_incidents(db, company, plant, assets, users)
         get_or_create_work_orders(db, company, plant, assets, users, incidents)
+        get_or_create_preventive_plans(db, company, assets, users)
+        get_or_create_inventory(db, company, users)
+        get_or_create_documents(db, company, assets, users)
         db.commit()
         print("Demo ForgeOps preparada sin duplicados.")
 

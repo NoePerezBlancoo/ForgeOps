@@ -24,6 +24,18 @@ const labels: Record<string, string> = {
   MAINTENANCE_MANAGER: "Responsable de mantenimiento",
   TECHNICIAN: "Tecnico",
   VIEWER: "Consulta",
+  DAYS: "Dias",
+  WEEKS: "Semanas",
+  MONTHS: "Meses",
+  YEARS: "Anos",
+  RECEIPT: "Entrada",
+  CONSUMPTION: "Consumo",
+  ADJUSTMENT: "Ajuste",
+  MANUAL: "Manual",
+  ELECTRICAL_SCHEMATIC: "Esquema electrico",
+  PROCEDURE: "Procedimiento",
+  SAFETY: "Seguridad",
+  OTHER: "Otro",
 };
 
 export function labelFor(value: string): string {
@@ -48,4 +60,3 @@ export function initials(name: string): string {
     .join("")
     .toUpperCase();
 }
-

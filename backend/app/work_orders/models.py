@@ -36,6 +36,9 @@ class WorkOrder(UUIDPrimaryKeyMixin, TenantMixin, Base):
     incident_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("incidents.id", ondelete="SET NULL"), index=True
     )
+    preventive_plan_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("preventive_plans.id", ondelete="SET NULL"), index=True
+    )
     assigned_to: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
@@ -71,5 +74,8 @@ class WorkOrder(UUIDPrimaryKeyMixin, TenantMixin, Base):
 
     asset: Mapped["Asset"] = relationship(back_populates="work_orders")  # noqa: F821
     incident: Mapped["Incident | None"] = relationship(back_populates="work_orders")  # noqa: F821
+    preventive_plan: Mapped["PreventivePlan | None"] = relationship(  # noqa: F821
+        back_populates="work_orders"
+    )
     assignee: Mapped["User | None"] = relationship(foreign_keys=[assigned_to])  # noqa: F821
     creator: Mapped["User"] = relationship(foreign_keys=[created_by])  # noqa: F821

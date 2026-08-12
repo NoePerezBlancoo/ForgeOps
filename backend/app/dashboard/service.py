@@ -8,6 +8,8 @@ from app.assets.models import Asset
 from app.core.enums import AssetStatus, IncidentStatus, Priority, WorkOrderStatus
 from app.dashboard.schemas import ChartItem, DashboardRead, RecentIncident, UpcomingWorkOrder
 from app.incidents.models import Incident
+from app.inventory.models import InventoryItem
+from app.maintenance.models import PreventivePlan
 from app.work_orders.models import WorkOrder
 
 
@@ -49,6 +51,20 @@ def dashboard_data(db: Session, company_id: uuid.UUID) -> DashboardRead:
             Incident.reported_at >= datetime.now(UTC) - timedelta(days=30),
         )
     )
+    upcoming_preventive_count = db.scalar(
+        select(func.count(PreventivePlan.id)).where(
+            PreventivePlan.company_id == company_id,
+            PreventivePlan.active.is_(True),
+            PreventivePlan.next_execution <= datetime.now(UTC) + timedelta(days=30),
+        )
+    )
+    low_stock_items = db.scalar(
+        select(func.count(InventoryItem.id)).where(
+            InventoryItem.company_id == company_id,
+            InventoryItem.active.is_(True),
+            InventoryItem.stock <= InventoryItem.minimum_stock,
+        )
+    )
     recent_rows = db.execute(
         select(Incident, Asset.code)
         .join(Asset, Asset.id == Incident.asset_id)
@@ -88,6 +104,8 @@ def dashboard_data(db: Session, company_id: uuid.UUID) -> DashboardRead:
         pending_work_orders=pending_orders,
         in_progress_work_orders=order_counts.get(WorkOrderStatus.IN_PROGRESS, 0),
         completed_work_orders=order_counts.get(WorkOrderStatus.COMPLETED, 0),
+        upcoming_preventive_count=upcoming_preventive_count or 0,
+        low_stock_items=low_stock_items or 0,
         downtime_hours=round(float(downtime_minutes or 0) / 60, 1),
         asset_statuses=[
             ChartItem(label=key.value, value=value) for key, value in asset_counts.items()

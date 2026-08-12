@@ -1,1 +1,1 @@
-"""Modulo reservado para repuestos, stock y consumos en V0.2."""
+"""Spare parts inventory and traceable stock movements."""
