@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Boxes, Building2, ClipboardList, Factory, ShieldAlert, Timer, Users } from "lucide-react";
+import { Activity, AlertTriangle, Boxes, Building2, ClipboardList, Database, Factory, HardDrive, ServerCog, ShieldAlert, Timer, Users } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -72,6 +72,19 @@ export default function OperatorDashboardPage() {
             </div>
           </article>
           <article className="panel p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div><h3 className="text-sm font-bold">Servicios</h3><p className="mt-1 text-[10px] text-[var(--muted)]">v{data.version} · {data.environment} · {data.commit.slice(0, 8)}</p></div>
+              <Activity size={18} className="text-[var(--accent)]" />
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <ServiceState icon={Database} label="PostgreSQL" value={data.service_status.database} />
+              <ServiceState icon={ServerCog} label="Redis" value={data.service_status.redis} />
+              <ServiceState icon={HardDrive} label="Storage" value={data.service_status.storage} />
+            </div>
+            <div className="mt-4 flex justify-between border-t border-[var(--line)] pt-3 text-xs"><span className="text-[var(--muted)]">Cola pendiente</span><strong>{data.queue_depth ?? "-"}</strong></div>
+            <div className="mt-2 flex justify-between text-xs"><span className="text-[var(--muted)]">Jobs fallidos</span><strong className={data.failed_jobs ? "text-red-700" : ""}>{data.failed_jobs}</strong></div>
+          </article>
+          <article className="panel p-5">
             <h3 className="text-sm font-bold">Adopcion de modulos</h3>
             <div className="mt-4 space-y-4">{Object.entries(data.module_adoption).map(([module, count]) => { const percent = data.total_companies ? Math.round((count / data.total_companies) * 100) : 0; return <div key={module}><div className="flex justify-between text-xs"><span className="font-semibold text-[var(--ink-soft)]">{moduleNames[module as CompanyModule]}</span><span className="font-bold">{count} · {percent}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e8ecea]"><div className="h-full bg-[var(--accent)]" style={{ width: `${percent}%` }} /></div></div>; })}</div>
           </article>
@@ -88,4 +101,9 @@ function Metric({ label, value, icon: Icon, detail, tone = "normal" }: { label: 
 
 function CompactMetric({ icon: Icon, label, value }: { icon: typeof ShieldAlert; label: string; value: number }) {
   return <div className="rounded-md border border-[var(--line)] bg-[#fafcfb] p-3"><Icon size={16} className="text-[var(--accent)]" /><p className="mt-3 text-lg font-bold">{value}</p><p className="mt-1 text-[10px] font-semibold leading-4 text-[var(--muted)]">{label}</p></div>;
+}
+
+function ServiceState({ icon: Icon, label, value }: { icon: typeof Database; label: string; value: string }) {
+  const healthy = value === "operational";
+  return <div className="min-w-0 rounded-md border border-[var(--line)] bg-[#fafcfb] p-2 text-center"><Icon size={15} className={healthy ? "mx-auto text-emerald-700" : "mx-auto text-amber-700"} /><p className="mt-2 truncate text-[9px] font-bold">{label}</p><p className={`mt-1 truncate text-[9px] ${healthy ? "text-emerald-700" : "text-amber-700"}`}>{healthy ? "Operativo" : value === "local" ? "Local" : "Degradado"}</p></div>;
 }

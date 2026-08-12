@@ -4,9 +4,11 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
+import app.models  # noqa: F401
 from app.core.crypto import decrypt_json
 from app.core.database import SessionLocal, set_database_context
 from app.core.enums import JobStatus
+from app.core.logging import correlation_id_context, request_id_context
 from app.email.service import get_email_service, message_from_payload
 from app.jobs.models import BackgroundJob
 
@@ -14,6 +16,16 @@ logger = logging.getLogger("forgeops.worker")
 
 
 def execute_job(job_id: str) -> str:
+    request_token = request_id_context.set(job_id)
+    correlation_token = correlation_id_context.set(job_id)
+    try:
+        return _execute_job(job_id)
+    finally:
+        request_id_context.reset(request_token)
+        correlation_id_context.reset(correlation_token)
+
+
+def _execute_job(job_id: str) -> str:
     with SessionLocal() as db:
         set_database_context(db, "system")
         job = db.scalar(
@@ -50,6 +62,8 @@ def execute_job(job_id: str) -> str:
 
 
 def _run(job_type: str, payload: dict) -> str:
+    if job_type == "HEALTHCHECK":
+        return f"worker:{payload.get('value', 'ok')}"
     if job_type == "EMAIL_SEND":
         get_email_service().send(message_from_payload(payload))
         return f"email:{payload.get('template', 'generic')}"

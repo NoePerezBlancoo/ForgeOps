@@ -15,7 +15,10 @@ def main() -> None:
         return
     if not ROLE_PATTERN.fullmatch(role):
         raise SystemExit("DATABASE_RUNTIME_ROLE no es valido")
-    bootstrap_engine = create_engine(settings.database_url, poolclass=NullPool)
+    bootstrap_engine = create_engine(
+        settings.migration_database_url or settings.database_url,
+        poolclass=NullPool,
+    )
     with bootstrap_engine.begin() as connection:
         owner = connection.scalar(text("SELECT current_user"))
         if not ROLE_PATTERN.fullmatch(owner):

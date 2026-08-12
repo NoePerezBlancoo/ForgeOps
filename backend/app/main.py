@@ -13,10 +13,16 @@ from sqlalchemy import text
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import SessionLocal
-from app.core.logging import configure_logging, request_id_context
+from app.core.error_monitoring import configure_error_monitoring
+from app.core.logging import (
+    configure_logging,
+    correlation_id_context,
+    request_id_context,
+)
 from app.core.redis import redis_ready
 
 configure_logging()
+configure_error_monitoring()
 logger = logging.getLogger("forgeops.http")
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{8,64}$")
 
@@ -34,8 +40,14 @@ app.add_middleware(
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"],
-    expose_headers=["X-Request-ID"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Request-ID",
+        "X-Correlation-ID",
+        "Idempotency-Key",
+    ],
+    expose_headers=["X-Request-ID", "X-Correlation-ID"],
 )
 
 
@@ -50,6 +62,7 @@ def _error_payload(request: Request, code: str, detail, status_code: int) -> dic
         "detail": detail,
         "error": {"code": code, "message": detail, "status": status_code},
         "request_id": request_id,
+        "correlation_id": getattr(request.state, "correlation_id", request_id),
     }
 
 
@@ -88,8 +101,16 @@ async def unexpected_error(request: Request, exc: Exception) -> JSONResponse:
 @app.middleware("http")
 async def request_context(request: Request, call_next):
     request_id = _request_id(request)
+    correlation_candidate = request.headers.get("X-Correlation-ID", "")
+    correlation_id = (
+        correlation_candidate
+        if REQUEST_ID_PATTERN.fullmatch(correlation_candidate)
+        else request_id
+    )
     request.state.request_id = request_id
+    request.state.correlation_id = correlation_id
     context_token = request_id_context.set(request_id)
+    correlation_token = correlation_id_context.set(correlation_id)
     started_at = time.perf_counter()
     try:
         if settings.maintenance_mode and not request.url.path.startswith(
@@ -123,7 +144,9 @@ async def request_context(request: Request, call_next):
             },
         )
         request_id_context.reset(context_token)
+        correlation_id_context.reset(correlation_token)
     response.headers["X-Request-ID"] = request_id
+    response.headers["X-Correlation-ID"] = correlation_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"

@@ -19,7 +19,9 @@ else
   python -m scripts.check_migrations
 fi
 
-python -m scripts.ensure_runtime_role
+if [ "${RUN_RUNTIME_ROLE_SETUP:-false}" = "true" ]; then
+  python -m scripts.ensure_runtime_role
+fi
 
 if [ "${SEED_DEMO_DATA:-false}" = "true" ]; then
   python -m scripts.seed_demo

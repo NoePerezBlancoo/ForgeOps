@@ -40,6 +40,16 @@ export type InventoryMovementType = "RECEIPT" | "CONSUMPTION" | "ADJUSTMENT";
 export type DocumentType = "MANUAL" | "ELECTRICAL_SCHEMATIC" | "PROCEDURE" | "SAFETY" | "OTHER";
 export type DocumentIndexStatus = "PENDING" | "INDEXING" | "READY" | "FAILED" | "UNSUPPORTED";
 
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  sort: string;
+  filters: Record<string, string | boolean>;
+}
+
 export interface CompanySummary {
   id: string;
   name: string;
@@ -161,9 +171,17 @@ export interface OperatorDashboard {
   active_customers: number;
   suspended_companies: number;
   active_users: number;
+  total_plants: number;
   total_assets: number;
   open_incidents: number;
   open_work_orders: number;
+  storage_bytes: number;
+  queue_depth: number | null;
+  failed_jobs: number;
+  service_status: Record<string, string>;
+  version: string;
+  environment: string;
+  commit: string;
   module_adoption: Record<CompanyModule, number>;
   recent_companies: OperatorCompanySummary[];
 }

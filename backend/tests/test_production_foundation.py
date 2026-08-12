@@ -11,6 +11,7 @@ from app.companies.models import Company
 from app.core.config import Settings
 from app.core.crypto import decrypt_json
 from app.core.enums import CompanyPlan
+from app.core.redis import get_queue_redis, get_redis
 from app.documents.storage import LocalStorageService
 from app.jobs.models import BackgroundJob
 from app.jobs.service import enqueue_job
@@ -24,6 +25,11 @@ def test_production_configuration_rejects_insecure_defaults():
     assert "Configuracion de produccion insegura" in message
     assert "STORAGE_BACKEND debe ser s3" in message
     assert "COOKIE_SECURE debe estar activo" in message
+
+
+def test_rq_uses_binary_redis_connection():
+    assert get_redis().get_encoder().decode_responses is True
+    assert get_queue_redis().get_encoder().decode_responses is False
 
 
 def test_local_storage_validates_signature_and_tenant_boundary(tmp_path):

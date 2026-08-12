@@ -89,9 +89,17 @@ class OperatorDashboardRead(BaseModel):
     active_customers: int
     suspended_companies: int
     active_users: int
+    total_plants: int
     total_assets: int
     open_incidents: int
     open_work_orders: int
+    storage_bytes: int
+    queue_depth: int | None
+    failed_jobs: int
+    service_status: dict[str, str]
+    version: str
+    environment: str
+    commit: str
     module_adoption: dict[CompanyModule, int]
     recent_companies: list[OperatorCompanySummary]
 

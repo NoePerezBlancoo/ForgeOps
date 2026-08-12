@@ -5,13 +5,15 @@ from rq.serializers import JSONSerializer
 
 from app.core.config import settings
 from app.core.database import SessionLocal, set_database_context
+from app.core.error_monitoring import configure_error_monitoring
 from app.core.logging import configure_logging
-from app.core.redis import get_redis
+from app.core.redis import get_queue_redis
 from app.jobs.service import dispatch_pending_jobs
 
 
 def main() -> None:
     configure_logging()
+    configure_error_monitoring()
     logger = logging.getLogger("forgeops.worker")
     with SessionLocal() as db:
         set_database_context(db, "system")
@@ -19,7 +21,7 @@ def main() -> None:
     logger.info("worker_started", extra={"event": "worker_started"})
     if dispatched:
         logger.info("pending_jobs_dispatched", extra={"event": "pending_jobs_dispatched"})
-    connection = get_redis()
+    connection = get_queue_redis()
     queue = Queue(settings.job_queue_name, connection=connection, serializer=JSONSerializer)
     worker = Worker([queue], connection=connection, serializer=JSONSerializer)
     worker.work(with_scheduler=True)

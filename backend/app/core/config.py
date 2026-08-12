@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     database_url: str = "postgresql+psycopg://forgeops:forgeops-local-only@localhost:5432/forgeops"
+    migration_database_url: str | None = None
     database_pool_mode: Literal["direct", "pgbouncer"] = "direct"
     database_runtime_role: str | None = "forgeops_runtime"
     database_user_is_restricted: bool = False
@@ -94,6 +95,7 @@ class Settings(BaseSettings):
     rag_relative_score_floor: float = Field(default=0.72, ge=0, le=1)
 
     sentry_dsn: str | None = None
+    sentry_traces_sample_rate: float = Field(default=0.05, ge=0, le=1)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -102,6 +104,13 @@ class Settings(BaseSettings):
     def validate_secret_key(cls, value: str) -> str:
         if len(value) < 32:
             raise ValueError("SECRET_KEY debe tener al menos 32 caracteres")
+        return value
+
+    @field_validator("database_url", "migration_database_url", mode="before")
+    @classmethod
+    def normalize_postgresql_driver(cls, value):
+        if isinstance(value, str) and value.startswith(("postgres://", "postgresql://")):
+            return "postgresql+psycopg://" + value.split("://", 1)[1]
         return value
 
     @field_validator("ai_provider")
@@ -144,6 +153,10 @@ class Settings(BaseSettings):
             errors.append("las URLs publicas no pueden apuntar a localhost")
         if not self.database_url.startswith("postgresql+"):
             errors.append("DATABASE_URL debe utilizar PostgreSQL")
+        if self.migration_database_url and not self.migration_database_url.startswith(
+            "postgresql+"
+        ):
+            errors.append("MIGRATION_DATABASE_URL debe utilizar PostgreSQL")
         if self.database_pool_mode == "pgbouncer" and self.database_runtime_role:
             errors.append(
                 "PgBouncer requiere credenciales de rol restringido y DATABASE_RUNTIME_ROLE vacio"

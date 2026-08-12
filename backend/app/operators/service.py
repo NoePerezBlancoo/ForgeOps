@@ -3,6 +3,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
+from rq import Queue
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, joinedload
 
@@ -21,11 +22,15 @@ from app.core.enums import (
     CompanyModule,
     CompanyPlan,
     IncidentStatus,
+    JobStatus,
     SubscriptionStatus,
     UserRole,
     WorkOrderStatus,
 )
+from app.core.redis import get_queue_redis, redis_ready
+from app.documents.models import TechnicalDocument
 from app.incidents.models import Incident
+from app.jobs.models import BackgroundJob
 from app.operators.auth_service import add_operator_audit_event
 from app.operators.models import OperatorAuditEvent, PlatformOperator
 from app.operators.schemas import (
@@ -245,6 +250,16 @@ def platform_dashboard(db: Session) -> OperatorDashboardRead:
         for module in CompanyModule:
             if module.value in (enabled or []):
                 modules[module] += 1
+    redis_available = redis_ready()
+    queue_depth = None
+    if redis_available:
+        try:
+            queue_depth = Queue(
+                settings.job_queue_name,
+                connection=get_queue_redis(),
+            ).count
+        except Exception:
+            redis_available = False
     return OperatorDashboardRead(
         total_companies=db.scalar(select(func.count(Company.id))) or 0,
         active_trials=active_trials,
@@ -280,6 +295,7 @@ def platform_dashboard(db: Session) -> OperatorDashboardRead:
             .where(User.active.is_(True), Company.active.is_(True))
         )
         or 0,
+        total_plants=db.scalar(select(func.count(Plant.id))) or 0,
         total_assets=db.scalar(select(func.count(Asset.id))) or 0,
         open_incidents=db.scalar(
             select(func.count(Incident.id)).where(Incident.status.in_(OPEN_INCIDENT_STATUSES))
@@ -289,6 +305,23 @@ def platform_dashboard(db: Session) -> OperatorDashboardRead:
             select(func.count(WorkOrder.id)).where(WorkOrder.status.in_(OPEN_ORDER_STATUSES))
         )
         or 0,
+        storage_bytes=db.scalar(select(func.coalesce(func.sum(TechnicalDocument.file_size), 0)))
+        or 0,
+        queue_depth=queue_depth,
+        failed_jobs=db.scalar(
+            select(func.count(BackgroundJob.id)).where(
+                BackgroundJob.status == JobStatus.FAILED
+            )
+        )
+        or 0,
+        service_status={
+            "database": "operational",
+            "redis": "operational" if redis_available else "degraded",
+            "storage": "operational" if settings.storage_backend == "s3" else "local",
+        },
+        version=settings.app_version,
+        environment=settings.app_env,
+        commit=settings.build_commit,
         module_adoption=modules,
         recent_companies=recent,
     )

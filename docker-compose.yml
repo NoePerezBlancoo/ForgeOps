@@ -35,11 +35,14 @@ services:
   backend:
     build:
       context: ./backend
+      args:
+        INSTALL_DEV: "true"
     environment:
       APP_ENV: ${APP_ENV:-development}
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
       ALLOW_DEMO_SEED: ${ALLOW_DEMO_SEED:-true}
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      RUN_RUNTIME_ROLE_SETUP: ${RUN_RUNTIME_ROLE_SETUP:-true}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-forgeops}:${POSTGRES_PASSWORD:-forgeops-local-only}@postgres:5432/${POSTGRES_DB:-forgeops}
       DATABASE_POOL_MODE: ${DATABASE_POOL_MODE:-direct}
       DATABASE_RUNTIME_ROLE: ${DATABASE_RUNTIME_ROLE:-forgeops_runtime}
@@ -88,6 +91,8 @@ services:
   worker:
     build:
       context: ./backend
+      args:
+        INSTALL_DEV: "true"
     entrypoint: ["python", "-m", "app.jobs.worker"]
     environment:
       APP_ENV: ${APP_ENV:-development}
@@ -118,7 +123,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "from app.core.redis import get_redis; assert get_redis().ping()"]
+      test: ["CMD", "python", "-c", "from app.core.redis import get_queue_redis; assert get_queue_redis().ping()"]
       interval: 15s
       timeout: 5s
       retries: 10

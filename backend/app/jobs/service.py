@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.crypto import encrypt_json
 from app.core.enums import JobStatus
-from app.core.redis import get_redis
+from app.core.redis import get_queue_redis
 from app.jobs.models import BackgroundJob
 
 logger = logging.getLogger("forgeops.jobs")
@@ -59,10 +59,12 @@ def dispatch_job(db: Session, job: BackgroundJob) -> bool:
     try:
         queue = Queue(
             settings.job_queue_name,
-            connection=get_redis(),
+            connection=get_queue_redis(),
             serializer=JSONSerializer,
             default_timeout=900,
         )
+        if job.status == JobStatus.QUEUED and queue.fetch_job(str(job.id)):
+            return False
         queue.enqueue(
             "app.jobs.tasks.execute_job",
             str(job.id),
@@ -89,7 +91,7 @@ def dispatch_pending_jobs(db: Session, limit: int = 100) -> int:
     jobs = list(
         db.scalars(
             select(BackgroundJob)
-            .where(BackgroundJob.status == JobStatus.PENDING)
+            .where(BackgroundJob.status.in_([JobStatus.PENDING, JobStatus.QUEUED]))
             .order_by(BackgroundJob.created_at)
             .limit(limit)
         )

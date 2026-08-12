@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from app.core.config import settings
 
 request_id_context: ContextVar[str] = ContextVar("request_id", default="-")
+correlation_id_context: ContextVar[str] = ContextVar("correlation_id", default="-")
 
 
 class JsonFormatter(logging.Formatter):
@@ -16,6 +17,7 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
             "request_id": request_id_context.get(),
+            "correlation_id": correlation_id_context.get(),
             "environment": settings.app_env,
         }
         for field in ("method", "path", "status_code", "duration_ms", "event"):
