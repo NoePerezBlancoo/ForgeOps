@@ -11,6 +11,8 @@ import {
   FileCheck2,
   MessageSquarePlus,
   Pause,
+  PackageCheck,
+  PackagePlus,
   Pencil,
   Play,
   Plus,
@@ -36,6 +38,8 @@ import { ApiError } from "@/lib/api";
 import { formatDate, initials, labelFor } from "@/lib/format";
 import type {
   Asset,
+  InventoryItem,
+  InventoryMovement,
   Paginated,
   Priority,
   UserOption,
@@ -49,7 +53,7 @@ import type {
 } from "@/lib/types";
 
 const PAGE_SIZE = 25;
-type DialogName = "create" | "edit" | "team" | "note" | "complete" | "validate" | "close" | "reopen" | null;
+type DialogName = "create" | "edit" | "team" | "note" | "material" | "return-material" | "complete" | "validate" | "close" | "reopen" | null;
 
 const emptyCreate = {
   asset_id: "",
@@ -76,6 +80,7 @@ export default function WorkOrdersPage() {
   const [pageData, setPageData] = useState<Paginated<WorkOrder> | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<WorkOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,14 +96,19 @@ export default function WorkOrdersPage() {
   const [editForm, setEditForm] = useState({ assigned_to: "", priority: "MEDIUM" as Priority, scheduled_date: "", estimated_duration: "", observations: "" });
   const [teamForm, setTeamForm] = useState({ user_id: "", role: "TECHNICIAN" as WorkOrderParticipantRole });
   const [noteForm, setNoteForm] = useState({ note_type: "COMMENT" as WorkOrderNoteType, body: "" });
+  const [materialForm, setMaterialForm] = useState({ item_id: "", quantity: "1", reason: "" });
+  const [returnMovement, setReturnMovement] = useState<InventoryMovement | null>(null);
+  const [returnForm, setReturnForm] = useState({ quantity: "1", reason: "" });
   const [completeForm, setCompleteForm] = useState(emptyComplete);
   const [reviewNote, setReviewNote] = useState("");
   const detailRef = useRef<HTMLElement>(null);
   const deepLinkHandled = useRef(false);
+  const optionsSequence = useRef(0);
   const deferredSearch = useDeferredValue(search);
 
   const isManager = Boolean(user && ["SUPER_ADMIN", "ADMIN", "MAINTENANCE_MANAGER"].includes(user.role));
   const canAct = user?.role !== "VIEWER";
+  const inventoryEnabled = Boolean(user?.company.enabled_modules.includes("INVENTORY"));
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -131,17 +141,24 @@ export default function WorkOrdersPage() {
   }, [deferredSearch, page, request, scopedPath, statusFilter]);
 
   const loadOptions = useCallback(async () => {
+    const sequence = ++optionsSequence.current;
     try {
-      const [assetData, userData] = await Promise.all([
+      const [assetData, userData, inventoryData] = await Promise.all([
         request<Asset[]>(scopedPath("/assets")),
         request<UserOption[]>("/users/options"),
+        inventoryEnabled ? request<InventoryItem[]>("/inventory") : Promise.resolve([]),
       ]);
-      setAssets(assetData);
-      setUsers(userData.filter((item) => item.active && ["TECHNICIAN", "MAINTENANCE_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(item.role)));
+      if (sequence === optionsSequence.current) {
+        setAssets(assetData);
+        setUsers(userData.filter((item) => item.active && ["TECHNICIAN", "MAINTENANCE_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(item.role)));
+        setInventoryItems(inventoryData.filter((item) => item.active));
+      }
     } catch (requestError) {
-      setError(messageFor(requestError, "No se pudieron cargar las opciones"));
+      if (sequence === optionsSequence.current) {
+        setError(messageFor(requestError, "No se pudieron cargar las opciones"));
+      }
     }
-  }, [request, scopedPath]);
+  }, [inventoryEnabled, request, scopedPath]);
 
   const loadDetail = useCallback(async (orderId: string) => {
     setDetailLoading(true);
@@ -289,6 +306,88 @@ export default function WorkOrdersPage() {
     if (succeeded) setNoteForm({ note_type: "COMMENT", body: "" });
   }
 
+  function openMaterial() {
+    const preferredItem = inventoryItems.find((item) => Number(item.stock) > 0) ?? inventoryItems[0];
+    setMaterialForm({ item_id: preferredItem?.id ?? "", quantity: "1", reason: "" });
+    setDialog("material");
+  }
+
+  function openMaterialReturn(movement: InventoryMovement) {
+    if (!detail) return;
+    setReturnMovement(movement);
+    setReturnForm({ quantity: String(returnableQuantity(detail, movement)), reason: "" });
+    setDialog("return-material");
+  }
+
+  async function consumeMaterial(event: FormEvent) {
+    event.preventDefault();
+    if (!detail) return;
+    const item = inventoryItems.find((candidate) => candidate.id === materialForm.item_id);
+    if (!item) {
+      setError("Selecciona un repuesto disponible");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const updated = await request<WorkOrderDetail>(`/work-orders/${detail.id}/materials`, {
+        method: "POST",
+        body: JSON.stringify({
+          item_id: item.id,
+          quantity: Number(materialForm.quantity),
+          expected_version: item.version,
+          reason: materialForm.reason || null,
+        }),
+      });
+      setDetail(updated);
+      setDialog(null);
+      await Promise.all([loadOrders(), loadOptions()]);
+    } catch (requestError) {
+      setError(messageFor(requestError, "No se pudo registrar el material"));
+      if (requestError instanceof ApiError && requestError.status === 409) {
+        await Promise.all([loadDetail(detail.id), loadOptions()]);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function returnMaterial(event: FormEvent) {
+    event.preventDefault();
+    if (!detail || !returnMovement) return;
+    const item = inventoryItems.find((candidate) => candidate.id === returnMovement.item_id);
+    if (!item) {
+      setError("El repuesto ya no esta disponible en el inventario");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const updated = await request<WorkOrderDetail>(
+        `/work-orders/${detail.id}/materials/${returnMovement.id}/return`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            quantity: Number(returnForm.quantity),
+            expected_version: item.version,
+            reason: returnForm.reason || null,
+          }),
+        },
+      );
+      setDetail(updated);
+      setDialog(null);
+      setReturnMovement(null);
+      await Promise.all([loadOrders(), loadOptions()]);
+    } catch (requestError) {
+      setError(messageFor(requestError, "No se pudo devolver el material"));
+      if (requestError instanceof ApiError && requestError.status === 409) {
+        await Promise.all([loadDetail(detail.id), loadOptions()]);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function toggleChecklist(itemId: string, completed: boolean, version: number) {
     if (!detail) return;
     setActing(`checklist-${itemId}`);
@@ -334,7 +433,15 @@ export default function WorkOrdersPage() {
   const canComplete = Boolean(canAct && detail && operational && activeParticipant && (isManager || activeParticipant.role === "LEAD" || detail.assigned_to === user?.id));
   const canNote = Boolean(canAct && (isManager || activeParticipant));
   const canChecklist = Boolean(canAct && operational && (isManager || activeParticipant));
+  const canMaterial = Boolean(
+    canAct && inventoryEnabled && detail && ["ASSIGNED", "IN_PROGRESS", "WAITING"].includes(detail.status) && (isManager || activeParticipant),
+  );
+  const canReturnMaterial = Boolean(
+    canAct && inventoryEnabled && detail && ["ASSIGNED", "IN_PROGRESS", "WAITING", "PENDING_VALIDATION", "COMPLETED"].includes(detail.status) && (isManager || activeParticipant),
+  );
   const availableUsers = users.filter((candidate) => !detail?.participants.some((participant) => participant.active && participant.user_id === candidate.id));
+  const selectedMaterial = inventoryItems.find((item) => item.id === materialForm.item_id);
+  const returnLimit = detail && returnMovement ? returnableQuantity(detail, returnMovement) : 0;
 
   function selectOrder(orderId: string) {
     setSelectedId(orderId);
@@ -413,10 +520,14 @@ export default function WorkOrdersPage() {
               canComplete={canComplete}
               canNote={canNote}
               canChecklist={canChecklist}
+              canMaterial={canMaterial}
+              canReturnMaterial={canReturnMaterial}
               acting={acting}
               onEdit={openEdit}
               onTeam={() => { setTeamForm({ user_id: availableUsers[0]?.id ?? "", role: "TECHNICIAN" }); setDialog("team"); }}
               onNote={() => setDialog("note")}
+              onMaterial={openMaterial}
+              onReturnMaterial={openMaterialReturn}
               onStart={() => void mutate(detail.sessions.some((item) => item.user_id === user?.id) ? "resume" : "start", {}, "start")}
               onPause={() => void mutate("pause", {}, "pause")}
               onComplete={() => setDialog("complete")}
@@ -467,6 +578,23 @@ export default function WorkOrdersPage() {
         </div><ModalFooter saving={saving} onCancel={() => setDialog(null)} label="Registrar" icon={<MessageSquarePlus size={16} />} /></form>
       </Modal>
 
+      <Modal open={dialog === "material"} title="Consumir material" description={detail ? `Imputacion directa a ${detail.number}` : undefined} onClose={() => setDialog(null)}>
+        <form onSubmit={consumeMaterial}><div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
+          <div className="sm:col-span-2"><Field label="Repuesto"><select className="field" value={materialForm.item_id} onChange={(event) => setMaterialForm({ ...materialForm, item_id: event.target.value })} required><option value="">Seleccionar referencia</option>{inventoryItems.map((item) => <option key={item.id} value={item.id} disabled={Number(item.stock) <= 0}>{item.code} · {item.name} · {Number(item.stock).toLocaleString("es-ES")} {item.unit}</option>)}</select></Field></div>
+          <Field label="Cantidad"><input className="field" type="number" min="0.001" max={selectedMaterial ? Number(selectedMaterial.stock) : undefined} step="0.001" value={materialForm.quantity} onChange={(event) => setMaterialForm({ ...materialForm, quantity: event.target.value })} required /></Field>
+          <div><p className="field-label mb-2">Coste estimado</p><div className="flex min-h-10 items-center rounded-md border border-[var(--line)] bg-[#f7f9f8] px-3 text-sm font-bold text-[var(--ink-soft)]">{formatCurrency(Number(materialForm.quantity || 0) * Number(selectedMaterial?.cost ?? 0))}</div></div>
+          <div className="sm:col-span-2"><Field label="Motivo opcional"><input className="field" value={materialForm.reason} onChange={(event) => setMaterialForm({ ...materialForm, reason: event.target.value })} minLength={4} maxLength={255} placeholder="Ej. Sustitucion durante la intervencion" /></Field></div>
+        </div><ModalFooter saving={saving} onCancel={() => setDialog(null)} label="Registrar consumo" icon={<PackagePlus size={16} />} /></form>
+      </Modal>
+
+      <Modal open={dialog === "return-material"} title="Devolver material" description={returnMovement ? `${returnMovement.item.code} · maximo ${returnLimit.toLocaleString("es-ES")} ${returnMovement.item.unit}` : undefined} onClose={() => { setDialog(null); setReturnMovement(null); }}>
+        <form onSubmit={returnMaterial}><div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
+          <Field label="Cantidad"><input className="field" type="number" min="0.001" max={returnLimit} step="0.001" value={returnForm.quantity} onChange={(event) => setReturnForm({ ...returnForm, quantity: event.target.value })} required /></Field>
+          <div><p className="field-label mb-2">Abono de coste</p><div className="flex min-h-10 items-center rounded-md border border-[var(--line)] bg-[#f7f9f8] px-3 text-sm font-bold text-emerald-700">-{formatCurrency(Number(returnForm.quantity || 0) * Number(returnMovement?.unit_cost ?? 0))}</div></div>
+          <div className="sm:col-span-2"><Field label="Motivo opcional"><input className="field" value={returnForm.reason} onChange={(event) => setReturnForm({ ...returnForm, reason: event.target.value })} minLength={4} maxLength={255} placeholder="Ej. Material no utilizado" /></Field></div>
+        </div><ModalFooter saving={saving} onCancel={() => { setDialog(null); setReturnMovement(null); }} label="Confirmar devolucion" icon={<PackageCheck size={16} />} /></form>
+      </Modal>
+
       <Modal open={dialog === "complete"} title="Finalizar intervencion" description={detail?.number} onClose={() => setDialog(null)}>
         <form onSubmit={completeWork}><div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
           <div className="sm:col-span-2"><Field label="Trabajo realizado"><textarea className="field min-h-28" value={completeForm.work_performed} onChange={(event) => setCompleteForm({ ...completeForm, work_performed: event.target.value })} minLength={10} required /></Field></div>
@@ -484,7 +612,7 @@ export default function WorkOrdersPage() {
   );
 }
 
-function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, canComplete, canNote, canChecklist, acting, onEdit, onTeam, onNote, onStart, onPause, onComplete, onValidate, onClose, onReopen, onRemoveParticipant, onChecklist }: {
+function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, canComplete, canNote, canChecklist, canMaterial, canReturnMaterial, acting, onEdit, onTeam, onNote, onMaterial, onStart, onPause, onComplete, onValidate, onClose, onReopen, onRemoveParticipant, onChecklist, onReturnMaterial }: {
   detail: WorkOrderDetail;
   userId?: string;
   isManager: boolean;
@@ -493,10 +621,13 @@ function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, c
   canComplete: boolean;
   canNote: boolean;
   canChecklist: boolean;
+  canMaterial: boolean;
+  canReturnMaterial: boolean;
   acting: string;
   onEdit: () => void;
   onTeam: () => void;
   onNote: () => void;
+  onMaterial: () => void;
   onStart: () => void;
   onPause: () => void;
   onComplete: () => void;
@@ -505,6 +636,7 @@ function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, c
   onReopen: () => void;
   onRemoveParticipant: (participantId: string) => void;
   onChecklist: (itemId: string, completed: boolean, version: number) => void;
+  onReturnMaterial: (movement: InventoryMovement) => void;
 }) {
   const hasPreviousSession = detail.sessions.some((item) => item.user_id === userId);
   const activeParticipants = detail.participants.filter((item) => item.active);
@@ -521,12 +653,13 @@ function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, c
         </div>
       </header>
 
-      {(canStart || canPause || canComplete || canNote || (isManager && ["PENDING_VALIDATION", "COMPLETED", "CLOSED"].includes(detail.status))) && (
+      {(canStart || canPause || canComplete || canNote || canMaterial || (isManager && ["PENDING_VALIDATION", "COMPLETED", "CLOSED"].includes(detail.status))) && (
         <div className="flex flex-wrap gap-2 border-b border-[var(--line)] bg-[#fafcfb] p-4">
           {canStart && <button className="button-primary" disabled={Boolean(acting)} onClick={onStart}><Play size={16} /> {hasPreviousSession ? "Reanudar" : "Empezar"}</button>}
           {canPause && <button className="button-secondary" disabled={Boolean(acting)} onClick={onPause}><Pause size={16} /> Pausar</button>}
           {canComplete && <button className="button-secondary" onClick={onComplete}><Square size={15} /> Finalizar</button>}
           {canNote && <button className="button-secondary" onClick={onNote}><MessageSquarePlus size={16} /> Nota</button>}
+          {canMaterial && <button className="button-secondary" onClick={onMaterial}><PackagePlus size={16} /> Material</button>}
           {isManager && detail.status === "PENDING_VALIDATION" && <button className="button-primary" onClick={onValidate}><ShieldCheck size={16} /> Validar</button>}
           {isManager && detail.status === "COMPLETED" && <button className="button-primary" onClick={onClose}><FileCheck2 size={16} /> Cerrar</button>}
           {isManager && ["PENDING_VALIDATION", "COMPLETED", "CLOSED"].includes(detail.status) && <button className="button-secondary" onClick={onReopen}><RotateCcw size={16} /> Reabrir</button>}
@@ -542,6 +675,11 @@ function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, c
       {detail.checklist_items.length > 0 && <section className="border-b border-[var(--line)] p-5">
         <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><ClipboardCheck size={17} className="text-[var(--accent)]" /><h3 className="text-sm font-bold">Checklist</h3></div><span className="text-xs font-bold text-[var(--muted)]">{detail.checklist_items.filter((item) => item.completed_at).length}/{detail.checklist_items.length}</span></div>
         <div className="mt-3 space-y-2">{detail.checklist_items.map((item) => { const completed = Boolean(item.completed_at); return <button key={item.id} type="button" className={`flex min-h-12 w-full items-start gap-3 rounded-md border px-3 py-2.5 text-left ${completed ? "border-emerald-200 bg-emerald-50" : "border-[var(--line)] bg-white"}`} onClick={() => onChecklist(item.id, !completed, item.version)} disabled={!canChecklist || acting === `checklist-${item.id}`}><span className={`mt-0.5 grid size-6 shrink-0 place-items-center rounded ${completed ? "bg-emerald-600 text-white" : "border border-[var(--line)] text-[var(--muted)]"}`}>{completed ? <CheckCircle2 size={15} /> : item.position}</span><span className="min-w-0 flex-1"><span className={`block text-sm font-semibold ${completed ? "text-emerald-900" : "text-[var(--ink)]"}`}>{item.title}{item.required && <span className="ml-1 text-red-700">*</span>}</span>{item.instructions && <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">{item.instructions}</span>}{completed && <span className="mt-1 block text-[10px] font-semibold text-emerald-800">{item.completer?.full_name ?? "Usuario historico"} - {formatDate(item.completed_at, true)}</span>}</span></button>; })}</div>
+      </section>}
+
+      {(detail.inventory_movements.length > 0 || canMaterial) && <section className="border-b border-[var(--line)] p-5">
+        <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><PackageCheck size={17} className="text-[var(--accent)]" /><h3 className="text-sm font-bold">Materiales</h3><span className="text-xs text-[var(--muted)]">{detail.inventory_movements.length}</span></div><span className="text-sm font-bold text-[var(--ink)]">{formatCurrency(Number(detail.material_cost))}</span></div>
+        {detail.inventory_movements.length === 0 ? <p className="mt-3 text-xs text-[var(--muted)]">Sin consumos imputados a esta orden.</p> : <div className="mt-3 divide-y divide-[var(--line)]">{detail.inventory_movements.slice().reverse().map((movement) => { const isConsumption = movement.movement_type === "CONSUMPTION"; const remaining = isConsumption ? returnableQuantity(detail, movement) : 0; return <div key={movement.id} className="flex items-start gap-3 py-3"><span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-md ${isConsumption ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>{isConsumption ? <PackagePlus size={15} /> : <PackageCheck size={15} />}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-[var(--ink)]">{movement.item.code} · {movement.item.name}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{isConsumption ? "Consumido" : "Devuelto"}: {Math.abs(Number(movement.quantity)).toLocaleString("es-ES")} {movement.item.unit} · {movement.user.full_name}</p><p className="mt-1 text-[10px] text-[var(--muted)]">{formatDate(movement.created_at, true)}{isConsumption && remaining > 0 ? ` · ${remaining.toLocaleString("es-ES")} ${movement.item.unit} retornables` : ""}</p></div><div className="shrink-0 text-right"><p className={`text-xs font-bold ${Number(movement.total_cost) < 0 ? "text-emerald-700" : "text-[var(--ink)]"}`}>{Number(movement.total_cost) < 0 ? "-" : ""}{formatCurrency(Math.abs(Number(movement.total_cost)))}</p>{canReturnMaterial && isConsumption && remaining > 0 && <button className="icon-button mt-1 size-8" onClick={() => onReturnMaterial(movement)} title="Devolver material" aria-label={`Devolver ${movement.item.code}`}><RotateCcw size={14} /></button>}</div></div>; })}</div>}
       </section>}
 
       <section className="border-b border-[var(--line)] p-5">
@@ -561,12 +699,14 @@ function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, c
 }
 
 function TimelineIcon({ type }: { type: WorkOrderEventType }) {
-  const Icon = type === "STARTED" || type === "RESUMED" ? Play : type === "PAUSED" ? Pause : type === "COMPLETED" || type === "CLOSED" ? CheckCircle2 : type === "VALIDATED" ? ShieldCheck : type === "PARTICIPANT_ADDED" || type === "ASSIGNED" ? UserPlus : type === "REOPENED" ? RotateCcw : type === "UPDATED" ? Pencil : type === "CHECKLIST_UPDATED" ? ClipboardCheck : Wrench;
+  const Icon = type === "STARTED" || type === "RESUMED" ? Play : type === "PAUSED" ? Pause : type === "COMPLETED" || type === "CLOSED" ? CheckCircle2 : type === "VALIDATED" ? ShieldCheck : type === "PARTICIPANT_ADDED" || type === "ASSIGNED" ? UserPlus : type === "REOPENED" ? RotateCcw : type === "UPDATED" ? Pencil : type === "CHECKLIST_UPDATED" ? ClipboardCheck : type === "MATERIAL_CONSUMED" || type === "MATERIAL_RETURNED" ? PackageCheck : Wrench;
   return <Icon className="shrink-0 text-[var(--muted)]" size={13} />;
 }
 
 function Metric({ label, value }: { label: string; value: string }) { return <div className="min-w-0 bg-white px-3 py-2.5"><p className="text-[10px] font-bold uppercase text-[var(--muted)]">{label}</p><p className="mt-1 truncate text-xs font-semibold text-[var(--ink)]">{value}</p></div>; }
 function DetailText({ label, value }: { label: string; value: string | null }) { return value ? <div><p className="text-[10px] font-bold uppercase text-[var(--muted)]">{label}</p><p className="mt-1 whitespace-pre-wrap text-sm leading-5">{value}</p></div> : null; }
+function returnableQuantity(detail: WorkOrderDetail, movement: InventoryMovement) { const returned = detail.inventory_movements.filter((item) => item.reversal_of_id === movement.id).reduce((total, item) => total + Number(item.quantity), 0); return Math.max(0, Math.abs(Number(movement.quantity)) - returned); }
+function formatCurrency(value: number) { return value.toLocaleString("es-ES", { style: "currency", currency: "EUR" }); }
 function durationLabel(seconds: number | null) { if (seconds === null) return "Activo"; if (seconds < 60) return `${seconds} s`; const hours = Math.floor(seconds / 3600); const minutes = Math.floor((seconds % 3600) / 60); return hours ? `${hours} h ${minutes} min` : `${minutes} min`; }
 function messageFor(error: unknown, fallback: string) { return error instanceof ApiError ? error.message : fallback; }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="field-label mb-2">{label}</span>{children}</label>; }

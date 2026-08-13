@@ -1,7 +1,8 @@
 "use client";
 
 import { AlertTriangle, ArrowDownToLine, History, PackagePlus, Pencil, Search } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorBanner, LoadingBlock } from "@/components/feedback";
@@ -57,19 +58,24 @@ export default function InventoryPage() {
   const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [saving, setSaving] = useState(false);
+  const loadSequence = useRef(0);
   const canManage = Boolean(
     user && ["SUPER_ADMIN", "ADMIN", "MAINTENANCE_MANAGER"].includes(user.role),
   );
 
   const loadItems = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     setLoading(true);
     setError("");
     try {
-      setItems(await request<InventoryItem[]>("/inventory"));
+      const loaded = await request<InventoryItem[]>("/inventory");
+      if (sequence === loadSequence.current) setItems(loaded);
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : "No se pudo cargar el inventario");
+      if (sequence === loadSequence.current) {
+        setError(requestError instanceof ApiError ? requestError.message : "No se pudo cargar el inventario");
+      }
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   }, [request]);
 
@@ -126,7 +132,10 @@ export default function InventoryPage() {
       description: itemForm.description || null,
       location: itemForm.location || null,
     };
-    if (editing) delete payload.stock;
+    if (editing) {
+      delete payload.stock;
+      payload.expected_version = editing.version;
+    }
     try {
       await request(editing ? `/inventory/${editing.id}` : "/inventory", {
         method: editing ? "PATCH" : "POST",
@@ -157,13 +166,22 @@ export default function InventoryPage() {
     try {
       await request(`/inventory/${movementItem.id}/movements`, {
         method: "POST",
-        body: JSON.stringify({ movement_type: movementType, quantity: Number(quantity), reason }),
+        body: JSON.stringify({
+          movement_type: movementType,
+          quantity: Number(quantity),
+          reason,
+          expected_version: movementItem.version,
+        }),
       });
       setMovementItem(null);
       setNotice("Movimiento de stock registrado");
       await loadItems();
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "No se pudo registrar el movimiento");
+      if (requestError instanceof ApiError && requestError.status === 409) {
+        setMovementItem(null);
+        await loadItems();
+      }
     } finally {
       setSaving(false);
     }
@@ -237,7 +255,7 @@ export default function InventoryPage() {
       </Modal>
 
       <Modal open={Boolean(historyItem)} title={`Historial de ${historyItem?.code ?? "repuesto"}`} description="Ultimos movimientos registrados." onClose={() => setHistoryItem(null)}>
-        <div className="max-h-[60vh] overflow-y-auto divide-y divide-[var(--line)]">{movements.length === 0 ? <EmptyState title="Sin movimientos" detail="Esta referencia todavia no tiene movimientos." /> : movements.map((movement) => <div key={movement.id} className="flex items-center gap-4 px-5 py-4 sm:px-6"><div className={`grid size-9 shrink-0 place-items-center rounded-md ${Number(movement.quantity) >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{Number(movement.quantity) >= 0 ? "+" : "-"}</div><div className="min-w-0 flex-1"><p className="text-xs font-bold text-[var(--ink)]">{labelFor(movement.movement_type)} · {movement.reason}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{movement.user.full_name} · {formatDate(movement.created_at, true)}</p></div><div className="text-right"><p className="text-sm font-bold">{Number(movement.quantity) > 0 ? "+" : ""}{Number(movement.quantity).toLocaleString("es-ES")}</p><p className="text-[10px] text-[var(--muted)]">Stock {Number(movement.resulting_stock).toLocaleString("es-ES")}</p></div></div>)}</div>
+        <div className="max-h-[60vh] divide-y divide-[var(--line)] overflow-y-auto">{movements.length === 0 ? <EmptyState title="Sin movimientos" detail="Esta referencia todavia no tiene movimientos." /> : movements.map((movement) => <div key={movement.id} className="flex items-start gap-3 px-5 py-4 sm:px-6"><div className={`grid size-9 shrink-0 place-items-center rounded-md ${Number(movement.quantity) >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{Number(movement.quantity) >= 0 ? "+" : "-"}</div><div className="min-w-0 flex-1"><p className="text-xs font-bold text-[var(--ink)]">{labelFor(movement.movement_type)} · {movement.reason}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{movement.user.full_name} · {formatDate(movement.created_at, true)}</p>{movement.work_order_id && <Link className="mt-1 inline-block text-[11px] font-bold text-[var(--accent)] hover:underline" href={`/work-orders?order=${movement.work_order_id}`}>Ver orden vinculada</Link>}</div><div className="shrink-0 text-right"><p className="text-sm font-bold">{Number(movement.quantity) > 0 ? "+" : ""}{Number(movement.quantity).toLocaleString("es-ES")} {movement.item.unit}</p><p className="text-[10px] text-[var(--muted)]">Stock {Number(movement.resulting_stock).toLocaleString("es-ES")}</p>{movement.work_order_id && <p className="mt-1 text-[10px] font-semibold text-[var(--ink-soft)]">{formatCurrency(Math.abs(Number(movement.total_cost)))}</p>}</div></div>)}</div>
       </Modal>
     </>
   );
@@ -245,4 +263,8 @@ export default function InventoryPage() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block"><span className="field-label mb-2">{label}</span>{children}</label>;
+}
+
+function formatCurrency(value: number) {
+  return value.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
 }

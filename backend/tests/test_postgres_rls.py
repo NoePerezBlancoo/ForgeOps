@@ -1,6 +1,7 @@
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine, delete, event, select
@@ -16,12 +17,14 @@ from app.core.database import set_database_context
 from app.core.enums import (
     AssetStatus,
     Criticality,
+    InventoryMovementType,
     NotificationType,
     Priority,
     UserRole,
     WorkOrderStatus,
     WorkOrderType,
 )
+from app.inventory.models import InventoryItem, InventoryMovement
 from app.invitations.models import UserInvitation
 from app.maintenance.models import ChecklistTemplate, ChecklistTemplateItem
 from app.notifications.models import Notification
@@ -347,6 +350,181 @@ def test_preventive_checklists_enforce_tenant_boundaries():
         assert set(db.scalars(select(WorkOrderChecklistItem.id).where(
             WorkOrderChecklistItem.id.in_(snapshot_ids)
         ))) == snapshot_ids
+    finally:
+        db.rollback()
+        if transaction.is_active:
+            transaction.rollback()
+        db.close()
+        connection.close()
+        engine.dispose()
+
+
+def test_inventory_movements_and_work_order_links_enforce_tenant_boundaries():
+    engine = _runtime_engine()
+    connection = engine.connect()
+    transaction = connection.begin()
+    db = Session(bind=connection, expire_on_commit=False)
+    suffix = uuid.uuid4().hex[:8]
+    try:
+        set_database_context(db, "system")
+        companies = [
+            Company(name=f"Inventory {label} {suffix}", tax_id=f"INV-{label}-{suffix}")
+            for label in ("A", "B")
+        ]
+        db.add_all(companies)
+        db.flush()
+        plants = [
+            Plant(company_id=company.id, name=f"Inventory Plant {index}", code=f"I{index}{suffix}")
+            for index, company in enumerate(companies, start=1)
+        ]
+        users = [
+            User(
+                company_id=company.id,
+                full_name=f"Inventory Admin {index}",
+                email=f"inventory-{index}-{suffix}@rls.local",
+                password_hash=hash_password("RlsSecure123!"),
+                role=UserRole.ADMIN,
+            )
+            for index, company in enumerate(companies, start=1)
+        ]
+        db.add_all([*plants, *users])
+        db.flush()
+        assets = [
+            Asset(
+                company_id=company.id,
+                plant_id=plant.id,
+                code=f"INV-{index}-{suffix}",
+                name=f"Inventory asset {index}",
+                status=AssetStatus.ACTIVE,
+                criticality=Criticality.HIGH,
+            )
+            for index, (company, plant) in enumerate(
+                zip(companies, plants, strict=True), start=1
+            )
+        ]
+        items = [
+            InventoryItem(
+                company_id=company.id,
+                code=f"SP-{index}-{suffix}",
+                name=f"Spare part {index}",
+                stock=Decimal("8.000"),
+                minimum_stock=Decimal("2.000"),
+                unit="ud",
+                cost=Decimal("12.50"),
+            )
+            for index, company in enumerate(companies, start=1)
+        ]
+        db.add_all([*assets, *items])
+        db.flush()
+        orders = [
+            WorkOrder(
+                company_id=company.id,
+                plant_id=plant.id,
+                asset_id=asset.id,
+                created_by=user.id,
+                number=f"INV-{index}-{suffix}",
+                title="Inventory-linked order",
+                description="Order used to verify inventory movement isolation.",
+                type=WorkOrderType.CORRECTIVE,
+                priority=Priority.MEDIUM,
+                status=WorkOrderStatus.OPEN,
+            )
+            for index, (company, plant, asset, user) in enumerate(
+                zip(companies, plants, assets, users, strict=True), start=1
+            )
+        ]
+        db.add_all(orders)
+        db.flush()
+        movements = [
+            InventoryMovement(
+                company_id=company.id,
+                item_id=item.id,
+                user_id=user.id,
+                work_order_id=order.id,
+                movement_type=InventoryMovementType.CONSUMPTION,
+                quantity=Decimal("-1.000"),
+                resulting_stock=Decimal("7.000"),
+                unit_cost=Decimal("12.50"),
+                total_cost=Decimal("12.50"),
+                reason="Tenant-specific material consumption",
+            )
+            for company, item, user, order in zip(
+                companies, items, users, orders, strict=True
+            )
+        ]
+        db.add_all(movements)
+        db.flush()
+        item_ids = {item.id for item in items}
+        movement_ids = {movement.id for movement in movements}
+        db.expunge_all()
+
+        set_database_context(db, "tenant", companies[0].id)
+        assert set(db.scalars(select(InventoryItem.id).where(
+            InventoryItem.id.in_(item_ids)
+        ))) == {items[0].id}
+        assert set(db.scalars(select(InventoryMovement.id).where(
+            InventoryMovement.id.in_(movement_ids)
+        ))) == {movements[0].id}
+
+        with pytest.raises(DBAPIError):
+            with db.begin_nested():
+                movement = db.get(InventoryMovement, movements[0].id)
+                movement.reason = "Historical movement must remain immutable"
+                db.flush()
+
+        with pytest.raises(DBAPIError):
+            with db.begin_nested():
+                db.add(
+                    InventoryMovement(
+                        company_id=companies[1].id,
+                        item_id=items[1].id,
+                        user_id=users[1].id,
+                        work_order_id=orders[1].id,
+                        movement_type=InventoryMovementType.CONSUMPTION,
+                        quantity=Decimal("-1.000"),
+                        resulting_stock=Decimal("6.000"),
+                        unit_cost=Decimal("12.50"),
+                        total_cost=Decimal("12.50"),
+                        reason="Cross-tenant movement must fail",
+                    )
+                )
+                db.flush()
+
+        with pytest.raises(DBAPIError):
+            with db.begin_nested():
+                db.add(
+                    InventoryMovement(
+                        company_id=companies[0].id,
+                        item_id=items[0].id,
+                        user_id=users[1].id,
+                        work_order_id=orders[0].id,
+                        movement_type=InventoryMovementType.CONSUMPTION,
+                        quantity=Decimal("-1.000"),
+                        resulting_stock=Decimal("6.000"),
+                        unit_cost=Decimal("12.50"),
+                        total_cost=Decimal("12.50"),
+                        reason="Cross-tenant author link must fail",
+                    )
+                )
+                db.flush()
+
+        with pytest.raises(DBAPIError):
+            with db.begin_nested():
+                db.add(
+                    InventoryMovement(
+                        company_id=companies[0].id,
+                        item_id=items[1].id,
+                        user_id=users[0].id,
+                        work_order_id=orders[0].id,
+                        movement_type=InventoryMovementType.CONSUMPTION,
+                        quantity=Decimal("-1.000"),
+                        resulting_stock=Decimal("6.000"),
+                        unit_cost=Decimal("12.50"),
+                        total_cost=Decimal("12.50"),
+                        reason="Cross-tenant item link must fail",
+                    )
+                )
+                db.flush()
     finally:
         db.rollback()
         if transaction.is_active:

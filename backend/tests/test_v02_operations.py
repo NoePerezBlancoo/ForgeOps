@@ -176,10 +176,29 @@ def test_inventory_movements_are_traced_and_stock_cannot_be_negative(client):
     item = created.json()
     assert item["low_stock"] is False
 
+    updated = client.patch(
+        f"/api/v1/inventory/{item['id']}",
+        headers=headers,
+        json={"location": "A-01-01", "expected_version": item["version"]},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["version"] == item["version"] + 1
+    stale_update = client.patch(
+        f"/api/v1/inventory/{item['id']}",
+        headers=headers,
+        json={"location": "A-01-02", "expected_version": item["version"]},
+    )
+    assert stale_update.status_code == 409
+
     consumed = client.post(
         f"/api/v1/inventory/{item['id']}/movements",
         headers=headers,
-        json={"movement_type": "CONSUMPTION", "quantity": 4, "reason": "Orden de prueba"},
+        json={
+            "movement_type": "CONSUMPTION",
+            "quantity": 4,
+            "reason": "Orden de prueba",
+            "expected_version": updated.json()["version"],
+        },
     )
     assert consumed.status_code == 200
     assert float(consumed.json()["resulting_stock"]) == 1
@@ -190,13 +209,118 @@ def test_inventory_movements_are_traced_and_stock_cannot_be_negative(client):
     rejected = client.post(
         f"/api/v1/inventory/{item['id']}/movements",
         headers=headers,
-        json={"movement_type": "CONSUMPTION", "quantity": 2, "reason": "Consumo excesivo"},
+        json={
+            "movement_type": "CONSUMPTION",
+            "quantity": 2,
+            "reason": "Consumo excesivo",
+            "expected_version": refreshed.json()["version"],
+        },
     )
     assert rejected.status_code == 409
 
     movements = client.get(f"/api/v1/inventory/{item['id']}/movements", headers=headers)
     assert movements.status_code == 200
     assert len(movements.json()) == 2
+
+
+def test_work_order_materials_update_stock_cost_timeline_and_notifications(client, database):
+    headers = login(client, "admin@alpha.local", "Admin123!")
+    beta_headers = login(client, "admin@beta.local", "Admin123!")
+    asset = _first_asset(client, headers)
+    admin = database.scalar(select(User).where(User.email == "admin@alpha.local"))
+
+    item_response = client.post(
+        "/api/v1/inventory",
+        headers=headers,
+        json={
+            "code": "MAT-OT-001",
+            "name": "Material para orden",
+            "stock": 5,
+            "minimum_stock": 4,
+            "unit": "ud",
+            "cost": 10,
+            "active": True,
+        },
+    )
+    assert item_response.status_code == 201
+    item = item_response.json()
+    order_response = client.post(
+        "/api/v1/work-orders",
+        headers=headers,
+        json={
+            "plant_id": asset["plant_id"],
+            "asset_id": asset["id"],
+            "assigned_to": str(admin.id),
+            "title": "Sustituir material de prueba",
+            "description": "Intervencion para validar consumos trazables de inventario.",
+            "type": "CORRECTIVE",
+            "priority": "HIGH",
+        },
+    )
+    assert order_response.status_code == 201
+    order = order_response.json()
+
+    consumed = client.post(
+        f"/api/v1/work-orders/{order['id']}/materials",
+        headers=headers,
+        json={
+            "item_id": item["id"],
+            "quantity": 2,
+            "expected_version": item["version"],
+            "reason": "Sustitucion durante la intervencion",
+        },
+    )
+    assert consumed.status_code == 200
+    consumed_order = consumed.json()
+    assert float(consumed_order["material_cost"]) == 20
+    assert len(consumed_order["inventory_movements"]) == 1
+    movement = consumed_order["inventory_movements"][0]
+    assert movement["movement_type"] == "CONSUMPTION"
+    assert float(movement["quantity"]) == -2
+    assert movement["item"]["code"] == "MAT-OT-001"
+    assert any(event["event_type"] == "MATERIAL_CONSUMED" for event in consumed_order["events"])
+
+    cross_tenant = client.post(
+        f"/api/v1/work-orders/{order['id']}/materials",
+        headers=beta_headers,
+        json={"item_id": item["id"], "quantity": 1, "expected_version": 2},
+    )
+    assert cross_tenant.status_code == 404
+
+    stale = client.post(
+        f"/api/v1/work-orders/{order['id']}/materials",
+        headers=headers,
+        json={"item_id": item["id"], "quantity": 1, "expected_version": 1},
+    )
+    assert stale.status_code == 409
+
+    refreshed_item = client.get(f"/api/v1/inventory/{item['id']}", headers=headers).json()
+    returned = client.post(
+        f"/api/v1/work-orders/{order['id']}/materials/{movement['id']}/return",
+        headers=headers,
+        json={
+            "quantity": 0.5,
+            "expected_version": refreshed_item["version"],
+            "reason": "Material finalmente no utilizado",
+        },
+    )
+    assert returned.status_code == 200
+    returned_order = returned.json()
+    assert float(returned_order["material_cost"]) == 15
+    assert returned_order["inventory_movements"][-1]["reversal_of_id"] == movement["id"]
+    assert any(event["event_type"] == "MATERIAL_RETURNED" for event in returned_order["events"])
+
+    current_item = client.get(f"/api/v1/inventory/{item['id']}", headers=headers).json()
+    excessive_return = client.post(
+        f"/api/v1/work-orders/{order['id']}/materials/{movement['id']}/return",
+        headers=headers,
+        json={"quantity": 2, "expected_version": current_item["version"]},
+    )
+    assert excessive_return.status_code == 409
+
+    notifications = client.get("/api/v1/notifications", headers=headers)
+    assert notifications.status_code == 200
+    assert any(item["type"] == "LOW_STOCK" for item in notifications.json()["items"])
 
 
 def test_documents_are_private_and_downloadable(client, tmp_path):

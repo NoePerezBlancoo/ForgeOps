@@ -51,13 +51,15 @@ export type WorkOrderEventType =
   | "RESUMED"
   | "NOTE_ADDED"
   | "CHECKLIST_UPDATED"
+  | "MATERIAL_CONSUMED"
+  | "MATERIAL_RETURNED"
   | "STATUS_CHANGED"
   | "COMPLETED"
   | "VALIDATED"
   | "CLOSED"
   | "REOPENED";
 export type FrequencyType = "DAYS" | "WEEKS" | "MONTHS" | "YEARS";
-export type InventoryMovementType = "RECEIPT" | "CONSUMPTION" | "ADJUSTMENT";
+export type InventoryMovementType = "RECEIPT" | "CONSUMPTION" | "ADJUSTMENT" | "RETURN";
 export type DocumentType = "MANUAL" | "ELECTRICAL_SCHEMATIC" | "PROCEDURE" | "SAFETY" | "OTHER";
 export type DocumentIndexStatus = "PENDING" | "INDEXING" | "READY" | "FAILED" | "UNSUPPORTED";
 
@@ -490,6 +492,8 @@ export interface WorkOrderDetail extends WorkOrder {
   notes: WorkOrderNote[];
   events: WorkOrderEvent[];
   checklist_items: WorkOrderChecklistItem[];
+  inventory_movements: InventoryMovement[];
+  material_cost: string;
 }
 
 export interface DashboardData {
@@ -588,6 +592,7 @@ export interface InventoryItem {
   location: string | null;
   cost: string | null;
   active: boolean;
+  version: number;
   low_stock: boolean;
   created_at: string;
   updated_at: string;
@@ -595,14 +600,20 @@ export interface InventoryItem {
 
 export interface InventoryMovement {
   id: string;
+  company_id: string;
   item_id: string;
   user_id: string;
+  work_order_id: string | null;
+  reversal_of_id: string | null;
   movement_type: InventoryMovementType;
   quantity: string;
   resulting_stock: string;
+  unit_cost: string;
+  total_cost: string;
   reason: string;
   created_at: string;
   user: Pick<User, "id" | "full_name" | "email">;
+  item: Pick<InventoryItem, "id" | "code" | "name" | "unit">;
 }
 
 export interface TechnicalDocument {
