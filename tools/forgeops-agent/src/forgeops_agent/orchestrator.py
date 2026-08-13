@@ -47,9 +47,20 @@ class Orchestrator:
         self.runner = AiderRunner(config)
         self.checks = CheckRunner(config.repo_root)
 
-    def delegate(self, source: Path) -> Task:
+    def delegate(
+        self,
+        source: Path,
+        *,
+        allow_medium: bool = False,
+        allow_high: bool = False,
+    ) -> Task:
         task = self.store.load_task_file(source)
-        validate_task_policy(task, self.config.protected_path_prefixes)
+        validate_task_policy(
+            task,
+            self.config.protected_path_prefixes,
+            allow_medium=allow_medium,
+            allow_high=allow_high,
+        )
         return self.store.delegate(source)
 
     def run_task(
