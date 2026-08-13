@@ -6,8 +6,10 @@ from app.companies.models import Company
 from app.documents.models import TechnicalDocument
 from app.incidents.models import Incident
 from app.inventory.models import InventoryItem, InventoryMovement
+from app.invitations.models import UserInvitation
 from app.jobs.models import BackgroundJob
 from app.maintenance.models import PreventivePlan
+from app.notifications.models import Notification
 from app.onboarding.models import OnboardingProgress
 from app.operators.models import OperatorAuditEvent, OperatorSession, PlatformOperator
 from app.plants.models import Plant
@@ -29,8 +31,10 @@ __all__ = [
     "Incident",
     "InventoryItem",
     "InventoryMovement",
+    "UserInvitation",
     "KnowledgeChunk",
     "OnboardingProgress",
+    "Notification",
     "OperatorAuditEvent",
     "OperatorSession",
     "PasswordResetToken",

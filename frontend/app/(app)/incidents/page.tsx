@@ -102,6 +102,28 @@ export default function IncidentsPage() {
     window.history.replaceState({}, "", "/incidents");
   }, [assets, canManage, loading]);
 
+  useEffect(() => {
+    if (loading || !canManage || deepLinkHandled.current) return;
+    const incidentId = new URLSearchParams(window.location.search).get("incident");
+    if (!incidentId) return;
+    deepLinkHandled.current = true;
+    request<Incident>(`/incidents/${incidentId}`).then((incident) => {
+      setSelected(incident);
+      setManageForm({
+        assigned_to: incident.assigned_to ?? "",
+        status: incident.status,
+        priority: incident.priority,
+        downtime_minutes: String(incident.downtime_minutes),
+        root_cause: incident.root_cause ?? "",
+        resolution: incident.resolution ?? "",
+      });
+      setManageOpen(true);
+    }).catch((requestError) => {
+      setError(requestError instanceof ApiError ? requestError.message : "No se pudo abrir la incidencia");
+    });
+    window.history.replaceState({}, "", "/incidents");
+  }, [canManage, loading, request]);
+
   const incidents = pageData?.items ?? [];
 
   function openCreate() {

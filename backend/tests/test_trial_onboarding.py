@@ -81,6 +81,16 @@ def test_expired_trial_is_read_only_but_can_sign_in(client, database):
     blocked = client.post("/api/v1/assets", headers=headers, json={})
     assert blocked.status_code == 402
     assert "prueba ha finalizado" in blocked.json()["detail"]
+    assert client.post("/api/v1/notifications/read-all", headers=headers).status_code == 200
+    assert client.post(
+        "/api/v1/invitations",
+        headers=headers,
+        json={
+            "email": "blocked@alpha.local",
+            "full_name": "Blocked Invitation",
+            "role": "VIEWER",
+        },
+    ).status_code == 402
 
 
 def test_admin_can_configure_modules_and_dependencies(client):

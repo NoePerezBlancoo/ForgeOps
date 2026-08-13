@@ -6,10 +6,11 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.assets.models import Asset
-from app.core.enums import IncidentStatus, Priority, UserRole
+from app.core.enums import IncidentStatus, NotificationType, Priority, UserRole
 from app.core.pagination import paginate
 from app.incidents.models import Incident
 from app.incidents.schemas import IncidentCreate, IncidentUpdate
+from app.notifications.service import create_notification
 from app.users.models import User
 
 
@@ -132,6 +133,36 @@ def create_incident(
         values["status"] = IncidentStatus.ASSIGNED
     incident = Incident(company_id=company_id, reported_by=reporter_id, **values)
     db.add(incident)
+    db.flush()
+    if incident.priority == Priority.CRITICAL:
+        recipients = set(
+            db.scalars(
+                select(User.id).where(
+                    User.company_id == company_id,
+                    User.active.is_(True),
+                    User.role.in_(
+                        (
+                            UserRole.SUPER_ADMIN,
+                            UserRole.ADMIN,
+                            UserRole.MAINTENANCE_MANAGER,
+                        )
+                    ),
+                )
+            )
+        )
+        if incident.assigned_to:
+            recipients.add(incident.assigned_to)
+        for recipient_id in recipients:
+            create_notification(
+                db,
+                company_id=company_id,
+                recipient_id=recipient_id,
+                notification_type=NotificationType.CRITICAL_INCIDENT,
+                title="Incidencia critica registrada",
+                body=f"{asset.code}: {incident.title}",
+                href=f"/incidents?incident={incident.id}",
+                dedupe_key=f"critical-incident:{incident.id}",
+            )
     db.commit()
     return get_incident(db, company_id, incident.id)
 

@@ -15,6 +15,8 @@ ForgeOps 1.2.3 convierte el despliegue en un proceso verificable. La promocion d
 - Roadmap comercial y ADR de trazabilidad de intervenciones versionados.
 - Intervenciones multi-tecnico con sesiones, notas, historial inmutable y validacion responsable.
 - Centro de ordenes responsive con acciones operativas, equipo, tiempos y cierre controlado.
+- Invitaciones de empleados con activacion de un solo uso y conservacion del historial.
+- Notificaciones in-app para asignaciones e incidencias criticas con centro responsive.
 
 ## Estado de validacion
 
@@ -24,6 +26,8 @@ ForgeOps 1.2.3 convierte el despliegue en un proceso verificable. La promocion d
 | Smoke validator | `TESTED` | Ruff y pruebas unitarias ejecutadas |
 | Workflows staging/production | `IMPLEMENTED` | Revision de sintaxis y Quality Gate del PR |
 | Trazabilidad de intervenciones | `TESTED` | Suite API, migracion real, RLS, Redis y revision responsive |
+| Usuarios e invitaciones | `TESTED` | Token SHA-256, limites, aceptacion, revocacion, RLS y revision responsive |
+| Notificaciones in-app | `TESTED` | OT asignada, incidencia critica, destinatario, lectura y enlaces profundos |
 | Staging V1.2.2 | `STAGING_VALIDATED` | Release validator remoto con health, readiness y frontend |
 | Staging V1.2.3 | `EXTERNAL_BLOCKER` | `RAILWAY_STAGING_ENABLED=false` |
 | PostgreSQL/RLS y worker local | `TESTED` | PostgreSQL 17, rol runtime y roundtrip Redis ejecutados |

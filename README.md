@@ -12,7 +12,8 @@ La version **1.2.3 Production Deployment Foundation** convierte el piloto funcio
 - Listados de activos, incidencias y ordenes paginados y filtrados en servidor.
 - Preventivos, inventario y movimientos de repuesto.
 - Documentos privados, extraccion, pgvector y RAG con fuentes.
-- Usuarios y roles por empresa.
+- Usuarios y roles por empresa con invitaciones seguras y activacion por el empleado.
+- Centro de notificaciones para trabajos asignados y alertas operativas.
 - Trial autogestionado de 30 dias y onboarding integrado.
 - Planes Demo, Trial, Starter, Pro, Industrial y Enterprise.
 - Limites de usuarios, plantas, activos y almacenamiento.
@@ -90,7 +91,7 @@ ForgeOps incluye un orquestador local para delegar tareas acotadas a Aider y mod
 
 ## Seguridad
 
-- Argon2, JWT corto y refresh rotatorio `HttpOnly`.
+- Argon2, JWT corto, refresh rotatorio `HttpOnly` e invitaciones de un solo uso.
 - MFA TOTP obligatorio y bloqueo para operadores.
 - Autorizacion por rol y proteccion del ultimo administrador.
 - Aislamiento por empresa en servicios y PostgreSQL RLS forzado.

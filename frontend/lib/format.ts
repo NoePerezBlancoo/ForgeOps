@@ -71,6 +71,14 @@ const labels: Record<string, string> = {
   INDUSTRIAL: "Industrial",
   ENTERPRISE: "Enterprise",
   INACTIVE: "Inactiva",
+  ACCEPTED: "Aceptada",
+  REVOKED: "Revocada",
+  WORK_ORDER_ASSIGNED: "Trabajo asignado",
+  CRITICAL_INCIDENT: "Incidencia critica",
+  PREVENTIVE_DUE: "Preventivo proximo",
+  PREVENTIVE_OVERDUE: "Preventivo vencido",
+  LOW_STOCK: "Stock bajo",
+  TRIAL_EXPIRING: "Prueba proxima a caducar",
 };
 
 export function labelFor(value: string): string {

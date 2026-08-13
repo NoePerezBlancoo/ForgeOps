@@ -42,6 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     delegate = commands.add_parser("delegate")
     delegate.add_argument("task_file", type=Path)
+    add_risk_flags(delegate)
     create = commands.add_parser("create-task")
     create.add_argument("--from-template", required=True, type=Path)
     create.add_argument("--output", type=Path)
@@ -142,7 +143,7 @@ def dispatch(args, config: OrchestratorConfig, orchestrator: Orchestrator) -> in
         print_json(result)
         return 0
     if command == "delegate":
-        task = orchestrator.delegate(args.task_file.resolve())
+        task = orchestrator.delegate(args.task_file.resolve(), **risk_flags(args))
         print(f"TASK: {task.id}\nSTATUS: QUEUED")
         return 0
     if command == "create-task":
