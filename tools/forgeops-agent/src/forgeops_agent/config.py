@@ -41,7 +41,7 @@ class OrchestratorConfig:
     agent_provider: str
     agent_image: str
     gateway_image: str
-    openhands_version: str
+    agent_version: str
     primary_model: str
     fallback_model: str | None
     ollama_url: str
@@ -82,7 +82,7 @@ class OrchestratorConfig:
                 agent_provider=data["agent"]["provider"],
                 agent_image=data["agent"]["image"],
                 gateway_image=data["agent"]["gateway_image"],
-                openhands_version=str(data["agent"]["openhands_version"]),
+                agent_version=str(data["agent"]["version"]),
                 primary_model=models["selection"]["primary"],
                 fallback_model=models["selection"].get("fallback"),
                 ollama_url=models["ollama"]["host_url"],
@@ -104,4 +104,3 @@ class OrchestratorConfig:
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ConfigurationError(f"Invalid orchestrator configuration: {exc}") from exc
-

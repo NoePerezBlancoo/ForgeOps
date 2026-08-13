@@ -25,7 +25,7 @@ from forgeops_agent.locks import FileLock
 from forgeops_agent.models import TERMINAL_STATUSES, Task, TaskState, TaskStatus
 from forgeops_agent.policy import scan_secrets, validate_changed_paths, validate_task_policy
 from forgeops_agent.reports import write_review_package, write_task_report
-from forgeops_agent.runner import OpenHandsRunner
+from forgeops_agent.runner import AiderRunner
 from forgeops_agent.store import TaskStore
 from forgeops_agent.system import resource_snapshot, resource_violations
 
@@ -34,7 +34,9 @@ class Orchestrator:
     def __init__(self, config: OrchestratorConfig):
         self.config = config
         self.store = TaskStore(config.ai_root)
-        self.runner = OpenHandsRunner(config)
+        if config.agent_provider != "aider":
+            raise PolicyError(f"Unsupported local agent provider: {config.agent_provider}")
+        self.runner = AiderRunner(config)
         self.checks = CheckRunner(config.repo_root)
 
     def delegate(self, source: Path) -> Task:
@@ -220,13 +222,10 @@ Required checks performed by the supervisor after you finish:
 Context files you may inspect:
 {self._bullets(task.context_files or task.allowed_paths)}
 
-Available OpenHands tools:
-- `terminal` for local shell commands inside `/workspace`
-- `file_editor` for reading and changing files
-- `task_tracker`, `think` and `finish`
-
-Do not invent tool names or delegate to subagents. Start by reading the listed context files,
-make the scoped change with `file_editor`, inspect it, then call `finish`.
+Implementation instructions:
+- Edit only the explicitly supplied editable files.
+- Treat all read-only files as context; never reproduce or modify them.
+- Return after applying the smallest complete change. The supervisor runs trusted checks.
 
 Codex feedback from a previous attempt:
 
@@ -383,7 +382,7 @@ Work only inside `/workspace`. Do not create commits. Finish after implementing 
         payload = {
             "current_task": state.task_id,
             "status": state.status.value,
-            "runtime": "OpenHands in isolated Docker container",
+            "runtime": "Aider in isolated Docker container",
             "model": state.model,
             "attempt": state.attempts,
             "last_action": state.last_action,

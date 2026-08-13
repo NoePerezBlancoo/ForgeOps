@@ -33,5 +33,4 @@ REPORT: ...
 REVIEW_REQUIRED: true
 ```
 
-Security is layered: isolated worktree, protected branch checks, filtered host environment, container without Docker socket, offline network proxy restricted to Ollama, OpenHands pre-tool hook, path validation, secret scanning, trusted quality commands and supervisor-only commits.
-
+Security is layered: isolated worktree, protected branch checks, filtered host environment, container without Docker socket, offline network proxy restricted to Ollama, explicit editable/read-only files, disabled agent shell suggestions, path validation, secret scanning, trusted supervisor checks and supervisor-only commits.

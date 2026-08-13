@@ -38,7 +38,7 @@ class LocalAgentRunner(ABC):
         raise NotImplementedError
 
 
-class OpenHandsRunner(LocalAgentRunner):
+class AiderRunner(LocalAgentRunner):
     def __init__(self, config: OrchestratorConfig):
         self.config = config
 
@@ -46,8 +46,8 @@ class OpenHandsRunner(LocalAgentRunner):
         docker = self._run(["docker", "version", "--format", "{{.Server.Version}}"], check=False)
         image = self._run(["docker", "image", "inspect", self.config.agent_image], check=False)
         return {
-            "provider": "openhands",
-            "version": self.config.openhands_version,
+            "provider": "aider",
+            "version": self.config.agent_version,
             "docker": docker.stdout.strip() if docker.returncode == 0 else None,
             "agent_image_ready": image.returncode == 0,
             "network_isolation": ISOLATED_NETWORK,
@@ -56,7 +56,7 @@ class OpenHandsRunner(LocalAgentRunner):
     def ensure_runtime(self) -> None:
         self._ensure_image(
             self.config.agent_image,
-            self.config.ai_root / "docker" / "Dockerfile.openhands",
+            self.config.ai_root / "docker" / "Dockerfile.aider",
         )
         self._ensure_image(
             self.config.gateway_image,
@@ -120,11 +120,19 @@ class OpenHandsRunner(LocalAgentRunner):
         self.ensure_runtime()
         container = self.container_name(task.id)
         network = "bridge" if task.allow_network else ISOLATED_NETWORK
-        base_url = (
-            "http://host.docker.internal:11434/v1"
+        ollama_url = (
+            "http://host.docker.internal:11434"
             if task.allow_network
-            else f"http://{GATEWAY_CONTAINER}:11434/v1"
+            else f"http://{GATEWAY_CONTAINER}:11434"
         )
+        editable_files = self._expand_task_files(worktree, task.allowed_paths, limit=50)
+        read_only_files = [
+            path
+            for path in self._expand_task_files(worktree, task.context_files, limit=100)
+            if path not in editable_files
+        ]
+        if not editable_files:
+            raise AgentError("Aider tasks require at least one existing editable file")
         command = [
             "docker",
             "run",
@@ -153,45 +161,79 @@ class OpenHandsRunner(LocalAgentRunner):
             f"{worktree}:/workspace:rw",
             "-v",
             f"{prompt}:/task/prompt.md:ro",
-            "-v",
-            f"{self.config.repo_root / '.openhands' / 'hooks.json'}:/workspace/.openhands/hooks.json:ro",
-            "-v",
-            f"{self.config.repo_root / '.openhands' / 'hooks' / 'policy.py'}:/workspace/.openhands/hooks/policy.py:ro",
             "-w",
             "/workspace",
             "-e",
             "HOME=/home/agent",
             "-e",
-            f"LLM_MODEL=openai/{model}",
+            f"OLLAMA_API_BASE={ollama_url}",
             "-e",
-            f"LLM_BASE_URL={base_url}",
+            "AIDER_ANALYTICS=false",
             "-e",
-            "LLM_API_KEY=local-only",
-            "-e",
-            f"LLM_OLLAMA_BASE_URL={base_url.removesuffix('/v1')}",
-            "-e",
-            "RUNTIME=process",
-            "-e",
-            f"MAX_ITERATIONS={self.config.max_iterations}",
-            "-e",
-            "DISABLE_COLOR=true",
-            "-e",
-            "OPENHANDS_SUPPRESS_BANNER=1",
+            "NO_COLOR=1",
         ]
         if task.allow_network:
             command.extend(["--add-host", "host.docker.internal:host-gateway"])
         command.extend(
             [
                 self.config.agent_image,
-                "openhands",
-                "--headless",
-                "--json",
-                "--override-with-envs",
-                "-f",
+                "aider",
+                "--model",
+                f"ollama_chat/{model}",
+                "--weak-model",
+                f"ollama_chat/{model}",
+                "--message-file",
                 "/task/prompt.md",
+                "--yes-always",
+                "--no-git",
+                "--no-gitignore",
+                "--no-auto-commits",
+                "--no-dirty-commits",
+                "--no-suggest-shell-commands",
+                "--no-check-update",
+                "--no-analytics",
+                "--no-show-model-warnings",
+                "--no-pretty",
+                "--no-stream",
+                "--no-detect-urls",
+                "--edit-format",
+                "whole",
+                "--input-history-file",
+                "/home/agent/.aider.input.history",
+                "--chat-history-file",
+                "/home/agent/.aider.chat.history.md",
             ]
         )
+        for path in editable_files:
+            command.extend(["--file", path])
+        for path in read_only_files:
+            command.extend(["--read", path])
         return self._run_monitored(task, command, log_path)
+
+    @staticmethod
+    def _expand_task_files(
+        worktree: Path,
+        paths: tuple[str, ...],
+        *,
+        limit: int,
+    ) -> list[str]:
+        files: list[str] = []
+        for relative in paths:
+            candidate = worktree / relative
+            if candidate.is_file():
+                files.append(relative)
+                continue
+            if candidate.is_dir():
+                files.extend(
+                    path.relative_to(worktree).as_posix()
+                    for path in candidate.rglob("*")
+                    if path.is_file() and ".git" not in path.parts
+                )
+            if len(files) > limit:
+                raise AgentError(
+                    f"Task context expands to more than {limit} files; narrow its paths"
+                )
+        return sorted(set(files))
 
     def stop(self, task_id: str) -> None:
         self._run(
@@ -210,7 +252,7 @@ class OpenHandsRunner(LocalAgentRunner):
                 "docker",
                 "build",
                 "--build-arg",
-                f"OPENHANDS_VERSION={self.config.openhands_version}",
+                f"AIDER_VERSION={self.config.agent_version}",
                 "-t",
                 image,
                 "-f",

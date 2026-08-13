@@ -1,10 +1,10 @@
 version: 1
 
 agent:
-  provider: openhands
+  provider: aider
   image: forgeops-local-agent:1.0
   gateway_image: forgeops-ollama-gateway:1.0
-  openhands_version: 1.16.0
+  version: 0.86.0
 
 execution:
   max_parallel_tasks: 1
@@ -37,4 +37,3 @@ resources:
 
 reports:
   log_max_bytes: 10485760
-

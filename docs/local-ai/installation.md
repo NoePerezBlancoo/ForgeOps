@@ -23,9 +23,9 @@ ollama pull devstral-small-2:24b
 
 Restart Ollama after changing user environment variables. The orchestrator also sends `num_ctx=32768` explicitly during benchmarks. A 32K context is the practical target for this workstation; larger contexts increase KV-cache memory and may force avoidable CPU offload.
 
-OpenHands 1.16.0 is installed in the local agent image, not in ForgeOps production images. The image is built lazily on the first task. Only the task worktree is mounted and no Docker socket, SSH directory, browser profile or user home is exposed.
+Aider 0.86.0 is installed in the local agent image, not in ForgeOps production images. The image is built lazily on the first task. Only the task worktree is mounted and no Docker socket, SSH directory, browser profile or user home is exposed.
 
-Ubuntu 24.04 under WSL2 is useful for diagnostics and future interactive OpenHands use. The supported automation path remains the Docker runner so Windows host files stay outside the agent sandbox.
+OpenHands 1.16.0 was evaluated first, but both local candidates produced invalid tool calls in its current SDK integration. Aider was selected because its one-shot mode supports Ollama, explicit editable files and read-only context without exposing an agent shell. Ubuntu 24.04 under WSL2 remains useful for diagnostics; the supported automation path is the Docker runner so Windows host files stay outside the sandbox.
 
 ## First task
 
@@ -34,4 +34,3 @@ Ubuntu 24.04 under WSL2 is useful for diagnostics and future interactive OpenHan
 .\scripts\forgeops-agent.ps1 run AI-0001
 .\scripts\forgeops-agent.ps1 review-package AI-0001
 ```
-

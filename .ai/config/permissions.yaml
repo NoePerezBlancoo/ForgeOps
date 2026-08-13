@@ -7,6 +7,8 @@ paths:
     - .github/
     - .githooks/
     - .openhands/
+    - .aider.conf.yml
+    - .aider.model.settings.yml
     - .railway/
     - deploy/
     - .env

@@ -2,7 +2,7 @@
 
 This directory contains development tooling only. It is not imported, built or deployed by the ForgeOps runtime.
 
-The supervisor creates one `ai/*` branch and one sibling Git worktree per task. OpenHands runs inside a read-only Docker container with only that worktree mounted. Offline tasks use an internal Docker network whose only reachable service is a narrow proxy to the host Ollama API.
+The supervisor creates one `ai/*` branch and one sibling Git worktree per task. Aider runs inside a read-only Docker container with only that worktree mounted. It receives task files as editable and context files as read-only. Offline tasks use an internal Docker network whose only reachable service is a narrow proxy to the host Ollama API.
 
 Start with:
 
@@ -13,4 +13,3 @@ Start with:
 ```
 
 Configuration and templates are versioned. Runtime state, logs, task reports, locks, prompts and the `.ai/STOP` kill switch remain local.
-

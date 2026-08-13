@@ -81,7 +81,7 @@ GitHub Actions repite estas comprobaciones con PostgreSQL y Redis reales, prueba
 
 ## Local AI Development
 
-ForgeOps incluye un orquestador local para delegar tareas acotadas a OpenHands y modelos Ollama sin dar acceso a `main`, credenciales o infraestructura. Cada tarea utiliza una rama `ai/*`, un worktree independiente, un contenedor aislado, quality gates y revision final de Codex.
+ForgeOps incluye un orquestador local para delegar tareas acotadas a Aider y modelos Ollama sin dar acceso a `main`, credenciales o infraestructura. Cada tarea utiliza una rama `ai/*`, un worktree independiente, un contenedor aislado, quality gates y revision final de Codex.
 
 - [Instalacion](docs/local-ai/installation.md)
 - [Operaciones](docs/local-ai/operations.md)

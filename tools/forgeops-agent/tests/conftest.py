@@ -53,10 +53,10 @@ def make_config(repo: Path) -> OrchestratorConfig:
         repo_root=repo,
         ai_root=ai_root,
         worktrees_root=repo.parent / "ForgeOps-agent-worktrees",
-        agent_provider="openhands",
+        agent_provider="aider",
         agent_image="forgeops-local-agent:test",
         gateway_image="forgeops-ollama-gateway:test",
-        openhands_version="1.16.0",
+        agent_version="0.86.0",
         primary_model="test-model",
         fallback_model=None,
         ollama_url="http://127.0.0.1:11434",
@@ -76,4 +76,3 @@ def make_config(repo: Path) -> OrchestratorConfig:
         container_memory="1g",
         log_max_bytes=1024,
     )
-
