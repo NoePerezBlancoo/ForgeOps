@@ -53,7 +53,7 @@ def test_metrics_count_fallback_and_codex_correction(tmp_path):
                 "model_alias": "devstral",
                 "duration_seconds": 9,
                 "status": "COMPLETED",
-                "is_fallback": True,
+                "is_fallback": False,
             },
         ],
     )

@@ -124,6 +124,14 @@ class Orchestrator:
                 if not model_alias:
                     break
                 model = self.router.model_name(model_alias)
+                is_fallback_attempt = bool(
+                    model_attempt > 1
+                    or (
+                        state.fallback_used
+                        and state.retry_count > 0
+                        and model_alias == "devstral"
+                    )
+                )
                 state.model = model
                 state.last_action = f"local agent running ({model})"
                 self.store.save_state(state)
@@ -172,7 +180,7 @@ class Orchestrator:
                         result,
                         attempt_started,
                         resources_before,
-                        is_fallback=model_attempt > 1,
+                        is_fallback=is_fallback_attempt,
                     )
                     return self._finish(
                         task, state, TaskStatus.TIMEOUT, "Task timeout reached"
@@ -188,7 +196,7 @@ class Orchestrator:
                         result,
                         attempt_started,
                         resources_before,
-                        is_fallback=model_attempt > 1,
+                        is_fallback=is_fallback_attempt,
                     )
                     return self._finish(
                         task, state, TaskStatus.CANCELLED, "Kill switch activated"
@@ -268,7 +276,7 @@ class Orchestrator:
                         result,
                         attempt_started,
                         resources_before,
-                        is_fallback=model_attempt > 1,
+                        is_fallback=is_fallback_attempt,
                     )
                     if task.allow_commit:
                         state.last_action = "creating validated local commit"
@@ -292,7 +300,7 @@ class Orchestrator:
                     attempt_started,
                     resources_before,
                     retry_reason=retry_reason,
-                    is_fallback=model_attempt > 1,
+                    is_fallback=is_fallback_attempt,
                 )
                 if not use_fallback:
                     return self._finish(task, state, failure_status, failure_reason)

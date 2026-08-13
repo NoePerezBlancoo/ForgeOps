@@ -251,6 +251,11 @@ class TaskState:
     def from_dict(cls, data: dict[str, Any]) -> TaskState:
         values = dict(data)
         values["status"] = TaskStatus(values["status"])
+        if values.get("fallback_used"):
+            history = values.get("attempt_history", [])
+            for index, attempt in enumerate(history):
+                if index > 0 and attempt.get("model_alias") == "devstral":
+                    attempt["is_fallback"] = True
         return cls(**values)
 
     def to_dict(self) -> dict[str, Any]:
