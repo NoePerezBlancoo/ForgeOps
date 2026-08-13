@@ -523,6 +523,7 @@ Work only inside `/workspace`. Do not create commits. Finish after implementing 
         state.status = TaskStatus.REJECTED
         state.error = reason
         state.last_action = "rejected by Codex"
+        state.codex_correction_required = True
         self.store.save_state(state)
         self.store.move(task.id, "failed")
         write_task_report(self.config.ai_root, task, state)

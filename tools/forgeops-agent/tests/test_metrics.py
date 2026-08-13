@@ -66,3 +66,11 @@ def test_metrics_count_fallback_and_codex_correction(tmp_path):
     assert result["fallback_tasks"] == 1
     assert result["codex_review_corrections"] == 1
     assert result["models"]["devstral"]["fallback_attempts"] == 1
+
+
+def test_rejected_state_implies_codex_correction_required():
+    state = TaskState.from_dict(
+        {"task_id": "AI-1003", "status": "REJECTED", "attempt_history": []}
+    )
+
+    assert state.codex_correction_required is True

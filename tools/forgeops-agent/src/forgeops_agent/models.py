@@ -251,6 +251,8 @@ class TaskState:
     def from_dict(cls, data: dict[str, Any]) -> TaskState:
         values = dict(data)
         values["status"] = TaskStatus(values["status"])
+        if values["status"] is TaskStatus.REJECTED:
+            values["codex_correction_required"] = True
         if values.get("fallback_used"):
             history = values.get("attempt_history", [])
             for index, attempt in enumerate(history):
