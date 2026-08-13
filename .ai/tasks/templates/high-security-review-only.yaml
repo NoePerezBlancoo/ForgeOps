@@ -14,4 +14,3 @@ allow_merge: false
 allow_network: false
 risk: HIGH
 depends_on: []
-

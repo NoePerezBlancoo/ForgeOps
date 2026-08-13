@@ -107,4 +107,3 @@ class TaskStore:
             self.move(task.id, "failed")
             recovered.append(task.id)
         return recovered
-

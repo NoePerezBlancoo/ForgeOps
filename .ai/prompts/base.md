@@ -16,4 +16,3 @@ Mandatory rules:
 - Stop after the objective is complete. Report changed files, decisions and checks concisely.
 
 The worktree is disposable and isolated. Any change outside scope, suspected secret or failed quality gate will be rejected automatically.
-

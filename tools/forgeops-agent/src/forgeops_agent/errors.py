@@ -16,4 +16,3 @@ class TaskNotFoundError(AgentError):
 
 class LockError(AgentError):
     pass
-

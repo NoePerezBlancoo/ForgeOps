@@ -40,7 +40,7 @@ def write_task_report(ai_root: Path, task: Task, state: TaskState) -> tuple[Path
 
 # Duration
 
-Started: {state.started_at or 'N/A'}  
+Started: {state.started_at or 'N/A'}
 Finished: {state.finished_at or 'N/A'}
 
 # Files changed
@@ -97,9 +97,9 @@ def write_review_package(
     ) or "- Not run"
     content = f"""# {task.id}: {task.title}
 
-Status: **{state.status.value}**  
-Risk: **{task.risk.value}**  
-Branch: `{state.branch or 'N/A'}`  
+Status: **{state.status.value}**
+Risk: **{task.risk.value}**
+Branch: `{state.branch or 'N/A'}`
 Commit: `{state.commit or 'N/A'}`
 
 ## Objective
@@ -126,4 +126,3 @@ Allowed: {', '.join(task.allowed_paths)}
 """
     path.write_text(content, encoding="utf-8")
     return path
-

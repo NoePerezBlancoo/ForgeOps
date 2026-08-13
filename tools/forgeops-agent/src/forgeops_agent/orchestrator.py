@@ -233,10 +233,10 @@ class Orchestrator:
 
 ## Assigned task
 
-Task: {task.id}  
-Title: {task.title}  
-Risk: {task.risk.value}  
-Branch: {state.branch}  
+Task: {task.id}
+Title: {task.title}
+Risk: {task.risk.value}
+Branch: {state.branch}
 Attempt: {state.attempts}/{task.max_attempts}
 
 Objective:

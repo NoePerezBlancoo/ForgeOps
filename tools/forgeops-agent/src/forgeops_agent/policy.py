@@ -103,4 +103,3 @@ def scan_secrets(worktree: Path, paths: list[str]) -> PolicyResult:
             if pattern.search(content):
                 violations.append(f"possible {name} in {relative}")
     return PolicyResult(not violations, tuple(violations))
-

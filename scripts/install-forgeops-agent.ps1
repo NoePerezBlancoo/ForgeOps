@@ -11,4 +11,3 @@ if (-not (Test-Path -LiteralPath $Python)) {
 & $Python -m pip install --disable-pip-version-check -e "$RepoRoot\tools\forgeops-agent[test]"
 git -C $RepoRoot config core.hooksPath .githooks
 Write-Output "forgeops-agent installed in $Venv"
-

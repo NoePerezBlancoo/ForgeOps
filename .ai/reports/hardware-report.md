@@ -23,4 +23,3 @@ Detected on 2026-08-13. This report intentionally omits usernames, serial number
 | Ollama | 0.32.9 |
 
 The 16 GB GPU supports strong quantized coding models, but a nominal 19 GB model cannot remain entirely in VRAM with a useful KV cache. Benchmarking therefore compares the sparse Qwen3 Coder 30B model with the denser 24B Devstral Small 2 model at 32K context.
-

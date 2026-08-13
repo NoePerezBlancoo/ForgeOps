@@ -26,4 +26,3 @@ ForgeOps is a multi-tenant industrial CMMS. Next.js provides the PWA, FastAPI ex
 ## Local orchestration
 
 Read `.ai/README.md` and `docs/local-ai/codex-orchestration.md`. The supervisor is the authority for scope validation, secret scanning, checks and commits.
-

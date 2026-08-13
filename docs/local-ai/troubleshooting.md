@@ -35,4 +35,3 @@ Run `supervise` or `status`. The recovery pass marks abandoned tasks `INTERRUPTE
 ## GPU out of memory
 
 Run `ollama stop MODEL_NAME`, reduce context in `.ai/config/models.yaml`, or select the fallback. Never modify GPU voltage, BIOS or driver limits from the orchestrator.
-

@@ -126,4 +126,3 @@ def remove_worktree(repo: Path, worktree: Path) -> None:
         raise PolicyError("Cleanup refused: worktree contains uncommitted changes")
     run_git(repo, "worktree", "remove", str(worktree))
     run_git(repo, "worktree", "prune")
-

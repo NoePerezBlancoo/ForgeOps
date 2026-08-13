@@ -17,4 +17,3 @@ risk: LOW
 depends_on: []
 context_files:
   - frontend/app/work-orders/
-

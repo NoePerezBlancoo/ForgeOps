@@ -26,4 +26,3 @@
     "context_files": { "type": "array", "items": { "type": "string" } }
   }
 }
-
