@@ -14,6 +14,8 @@
 
 `approve` records Codex review. It never merges. `prepare-merge` only checks approval, worktree cleanliness and ancestry.
 
+For changed backend Python files, the supervisor applies deterministic Ruff import fixes and formatting to the already validated file list. It then recalculates the diff and repeats scope and secret validation before running the required checks. The formatter cannot expand the task scope.
+
 For corrections:
 
 ```powershell

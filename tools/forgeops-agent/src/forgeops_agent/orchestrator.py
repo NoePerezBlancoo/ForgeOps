@@ -158,9 +158,42 @@ class Orchestrator:
                     "; ".join(security.violations),
                 )
 
+            state.last_action = "applying deterministic formatting"
+            self.store.save_state(state)
+            checks = self.checks.format_changed_python(task.id, worktree, paths)
+            if not all(item.passed for item in checks):
+                state.check_results = [asdict(item) for item in checks]
+                state.test_status = "FAIL"
+                failure = next(item for item in checks if not item.passed)
+                return self._finish(
+                    task,
+                    state,
+                    TaskStatus.FAILED_TESTS,
+                    f"{failure.name}: {failure.summary}",
+                )
+            paths = changed_files(worktree, state.base_commit or "HEAD")
+            state.changed_files = paths
+            path_policy = validate_changed_paths(
+                task, paths, self.config.protected_path_prefixes
+            )
+            security = scan_secrets(worktree, paths)
+            if not path_policy.valid:
+                return self._finish(
+                    task,
+                    state,
+                    TaskStatus.FAILED_POLICY,
+                    "; ".join(path_policy.violations),
+                )
+            if not security.valid:
+                return self._finish(
+                    task,
+                    state,
+                    TaskStatus.FAILED_SECURITY,
+                    "; ".join(security.violations),
+                )
             state.last_action = "running quality checks"
             self.store.save_state(state)
-            checks = self.checks.run_all(task, worktree, paths)
+            checks.extend(self.checks.run_all(task, worktree, paths))
             state.check_results = [asdict(item) for item in checks]
             state.test_status = "PASS" if all(item.passed for item in checks) else "FAIL"
             if not all(item.passed for item in checks):

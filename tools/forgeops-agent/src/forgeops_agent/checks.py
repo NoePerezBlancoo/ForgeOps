@@ -41,6 +41,37 @@ class CheckRunner:
                 break
         return results
 
+    def format_changed_python(
+        self,
+        task_id: str,
+        worktree: Path,
+        changed_files: list[str],
+    ) -> list[CheckResult]:
+        targets = [
+            path.removeprefix("backend/")
+            for path in changed_files
+            if path.startswith("backend/") and path.endswith(".py")
+        ]
+        if not targets:
+            return []
+        for target in targets:
+            if not SAFE_TARGET.fullmatch(target):
+                return [CheckResult("backend-format", False, 2, 0, f"Unsafe path: {target}")]
+        image = self._backend_image(task_id, worktree)
+        commands = (
+            ["ruff", "check", "--fix", "--select", "I", *targets],
+            ["ruff", "format", *targets],
+        )
+        results: list[CheckResult] = []
+        for command in commands:
+            result = self._run_backend_command(
+                f"backend-format-{command[1]}", image, worktree, command
+            )
+            results.append(result)
+            if not result.passed:
+                break
+        return results
+
     def run(self, name: str, task_id: str, worktree: Path) -> CheckResult:
         started = time.monotonic()
         try:
@@ -72,6 +103,10 @@ class CheckRunner:
                 "--rm",
                 "--network",
                 "none",
+                "-v",
+                f"{worktree / 'backend'}:/app",
+                "-w",
+                "/app",
                 "--entrypoint",
                 "ruff",
                 image,
@@ -83,24 +118,13 @@ class CheckRunner:
             ]
         if name == "backend-pytest" or name == "pytest":
             image = self._backend_image(task_id, worktree)
-            return ["docker", "run", "--rm", "--network", "none", "--entrypoint", "pytest", image, "-q"]
+            return self._backend_container_command(worktree, image, ["pytest", "-q"])
         if name.startswith("pytest:"):
             target = name.split(":", 1)[1]
             if not SAFE_TARGET.fullmatch(target) or not target.startswith("tests/"):
                 raise ValueError(f"Unsafe pytest target: {target}")
             image = self._backend_image(task_id, worktree)
-            return [
-                "docker",
-                "run",
-                "--rm",
-                "--network",
-                "none",
-                "--entrypoint",
-                "pytest",
-                image,
-                "-q",
-                target,
-            ]
+            return self._backend_container_command(worktree, image, ["pytest", "-q", target])
         if name == "frontend-quality":
             script = "npm ci --ignore-scripts && npm run lint && npm run typecheck && npm test && npm run build"
             return [
@@ -119,6 +143,57 @@ class CheckRunner:
         if name == "docker-config":
             return ["docker", "compose", "config", "--quiet"]
         raise ValueError(f"Unknown required check: {name}")
+
+    def _run_backend_command(
+        self,
+        name: str,
+        image: str,
+        worktree: Path,
+        command: list[str],
+    ) -> CheckResult:
+        started = time.monotonic()
+        result = subprocess.run(
+            self._backend_container_command(worktree, image, command),
+            cwd=worktree,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=1800,
+            check=False,
+            env=safe_host_environment(),
+        )
+        output = (result.stdout + "\n" + result.stderr).strip()
+        summary = "\n".join(output.splitlines()[-12:])[-3000:] or "No output"
+        return CheckResult(
+            name,
+            result.returncode == 0,
+            result.returncode,
+            time.monotonic() - started,
+            summary,
+        )
+
+    @staticmethod
+    def _backend_container_command(
+        worktree: Path,
+        image: str,
+        command: list[str],
+    ) -> list[str]:
+        return [
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            "none",
+            "-v",
+            f"{worktree / 'backend'}:/app",
+            "-w",
+            "/app",
+            "--entrypoint",
+            command[0],
+            image,
+            *command[1:],
+        ]
 
     def _backend_image(self, task_id: str, worktree: Path) -> str:
         cached = self._backend_images.get(task_id)
@@ -151,4 +226,3 @@ class CheckRunner:
             raise ValueError(f"Backend check image failed to build:\n{detail}")
         self._backend_images[task_id] = image
         return image
-
