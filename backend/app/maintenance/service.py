@@ -5,21 +5,117 @@ from datetime import UTC, datetime, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.assets.models import Asset
 from app.core.enums import FrequencyType, WorkOrderStatus, WorkOrderType
-from app.maintenance.models import PreventivePlan
-from app.maintenance.schemas import PreventivePlanCreate, PreventivePlanUpdate
+from app.maintenance.models import ChecklistTemplate, ChecklistTemplateItem, PreventivePlan
+from app.maintenance.schemas import (
+    ChecklistTemplateCreate,
+    ChecklistTemplateUpdate,
+    PreventivePlanCreate,
+    PreventivePlanUpdate,
+)
 from app.users.models import User
-from app.work_orders.models import WorkOrder
+from app.work_orders.models import WorkOrder, WorkOrderChecklistItem
 from app.work_orders.service import initialize_work_order_history
 
 
 def _base_query():
     return select(PreventivePlan).options(
-        joinedload(PreventivePlan.asset), joinedload(PreventivePlan.assignee)
+        joinedload(PreventivePlan.asset),
+        joinedload(PreventivePlan.assignee),
+        joinedload(PreventivePlan.checklist_template).selectinload(ChecklistTemplate.items),
     )
+
+
+def _template_query():
+    return select(ChecklistTemplate).options(selectinload(ChecklistTemplate.items))
+
+
+def list_checklist_templates(
+    db: Session, company_id: uuid.UUID, active: bool | None = None
+) -> list[ChecklistTemplate]:
+    query = _template_query().where(ChecklistTemplate.company_id == company_id)
+    if active is not None:
+        query = query.where(ChecklistTemplate.active.is_(active))
+    return list(db.scalars(query.order_by(ChecklistTemplate.name)).unique())
+
+
+def get_checklist_template(
+    db: Session, company_id: uuid.UUID, template_id: uuid.UUID
+) -> ChecklistTemplate:
+    template = db.scalar(
+        _template_query().where(
+            ChecklistTemplate.id == template_id,
+            ChecklistTemplate.company_id == company_id,
+        )
+    )
+    if not template:
+        raise HTTPException(status_code=404, detail="Checklist no encontrado")
+    return template
+
+
+def create_checklist_template(
+    db: Session, company_id: uuid.UUID, payload: ChecklistTemplateCreate
+) -> ChecklistTemplate:
+    _validate_item_positions(payload.items)
+    template = ChecklistTemplate(
+        company_id=company_id,
+        name=payload.name.strip(),
+        description=payload.description.strip() if payload.description else None,
+        active=payload.active,
+    )
+    template.items = [
+        ChecklistTemplateItem(company_id=company_id, **item.model_dump())
+        for item in sorted(payload.items, key=lambda item: item.position)
+    ]
+    db.add(template)
+    _commit_template(db)
+    return get_checklist_template(db, company_id, template.id)
+
+
+def update_checklist_template(
+    db: Session,
+    company_id: uuid.UUID,
+    template_id: uuid.UUID,
+    payload: ChecklistTemplateUpdate,
+) -> ChecklistTemplate:
+    template = get_checklist_template(db, company_id, template_id)
+    changes = payload.model_dump(exclude_unset=True, exclude={"items"})
+    for field, value in changes.items():
+        if isinstance(value, str):
+            value = value.strip() or None
+        setattr(template, field, value)
+    if payload.items is not None:
+        _validate_item_positions(payload.items)
+        template.items.clear()
+        db.flush()
+        template.items = [
+            ChecklistTemplateItem(company_id=company_id, **item.model_dump())
+            for item in sorted(payload.items, key=lambda item: item.position)
+        ]
+    _commit_template(db)
+    return get_checklist_template(db, company_id, template.id)
+
+
+def _commit_template(db: Session) -> None:
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="Ya existe un checklist con ese nombre"
+        ) from exc
+
+
+def _validate_item_positions(items) -> None:
+    positions = sorted(item.position for item in items)
+    if positions != list(range(1, len(items) + 1)):
+        raise HTTPException(
+            status_code=422,
+            detail="Los pasos del checklist deben tener posiciones consecutivas desde 1",
+        )
 
 
 def _validate_asset(db: Session, company_id: uuid.UUID, asset_id: uuid.UUID) -> Asset:
@@ -37,6 +133,22 @@ def _validate_assignee(db: Session, company_id: uuid.UUID, user_id: uuid.UUID | 
     )
     if not user:
         raise HTTPException(status_code=422, detail="Responsable no valido")
+
+
+def _validate_template(
+    db: Session, company_id: uuid.UUID, template_id: uuid.UUID | None
+) -> None:
+    if not template_id:
+        return
+    template = db.scalar(
+        select(ChecklistTemplate.id).where(
+            ChecklistTemplate.id == template_id,
+            ChecklistTemplate.company_id == company_id,
+            ChecklistTemplate.active.is_(True),
+        )
+    )
+    if not template:
+        raise HTTPException(status_code=422, detail="Checklist no valido o inactivo")
 
 
 def list_plans(
@@ -67,6 +179,7 @@ def create_plan(
 ) -> PreventivePlan:
     _validate_asset(db, company_id, payload.asset_id)
     _validate_assignee(db, company_id, payload.assigned_to)
+    _validate_template(db, company_id, payload.checklist_template_id)
     plan = PreventivePlan(company_id=company_id, **payload.model_dump())
     db.add(plan)
     try:
@@ -87,6 +200,8 @@ def update_plan(
     changes = payload.model_dump(exclude_unset=True)
     if "assigned_to" in changes:
         _validate_assignee(db, company_id, changes["assigned_to"])
+    if "checklist_template_id" in changes:
+        _validate_template(db, company_id, changes["checklist_template_id"])
     for field, value in changes.items():
         setattr(plan, field, value)
     try:
@@ -111,6 +226,16 @@ def _advance(value: datetime, frequency_type: FrequencyType, amount: int) -> dat
 
 
 def generate_work_order(db: Session, current_user: User, plan_id: uuid.UUID) -> WorkOrder:
+    locked_plan = db.scalar(
+        select(PreventivePlan)
+        .where(
+            PreventivePlan.id == plan_id,
+            PreventivePlan.company_id == current_user.company_id,
+        )
+        .with_for_update()
+    )
+    if not locked_plan:
+        raise HTTPException(status_code=404, detail="Plan preventivo no encontrado")
     plan = get_plan(db, current_user.company_id, plan_id)
     if not plan.active:
         raise HTTPException(status_code=409, detail="El plan preventivo esta inactivo")
@@ -149,6 +274,18 @@ def generate_work_order(db: Session, current_user: User, plan_id: uuid.UUID) -> 
     plan.next_execution = _advance(plan.next_execution, plan.frequency_type, plan.frequency_value)
     db.add(order)
     initialize_work_order_history(db, order, current_user)
+    if plan.checklist_template:
+        order.checklist_items = [
+            WorkOrderChecklistItem(
+                company_id=order.company_id,
+                source_template_item_id=item.id,
+                title=item.title,
+                instructions=item.instructions,
+                position=item.position,
+                required=item.required,
+            )
+            for item in plan.checklist_template.items
+        ]
     db.commit()
     return order
 

@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleDot,
+  ClipboardCheck,
   Clock3,
   Eye,
   FileCheck2,
@@ -288,6 +289,23 @@ export default function WorkOrdersPage() {
     if (succeeded) setNoteForm({ note_type: "COMMENT", body: "" });
   }
 
+  async function toggleChecklist(itemId: string, completed: boolean, version: number) {
+    if (!detail) return;
+    setActing(`checklist-${itemId}`);
+    setError("");
+    try {
+      setDetail(await request<WorkOrderDetail>(
+        `/work-orders/${detail.id}/checklist/${itemId}`,
+        { method: "PATCH", body: JSON.stringify({ completed, version }) },
+      ));
+    } catch (requestError) {
+      setError(messageFor(requestError, "No se pudo actualizar el checklist"));
+      await loadDetail(detail.id);
+    } finally {
+      setActing("");
+    }
+  }
+
   async function completeWork(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
@@ -315,6 +333,7 @@ export default function WorkOrdersPage() {
   const canPause = Boolean(canAct && openSession);
   const canComplete = Boolean(canAct && detail && operational && activeParticipant && (isManager || activeParticipant.role === "LEAD" || detail.assigned_to === user?.id));
   const canNote = Boolean(canAct && (isManager || activeParticipant));
+  const canChecklist = Boolean(canAct && operational && (isManager || activeParticipant));
   const availableUsers = users.filter((candidate) => !detail?.participants.some((participant) => participant.active && participant.user_id === candidate.id));
 
   function selectOrder(orderId: string) {
@@ -393,6 +412,7 @@ export default function WorkOrdersPage() {
               canPause={canPause}
               canComplete={canComplete}
               canNote={canNote}
+              canChecklist={canChecklist}
               acting={acting}
               onEdit={openEdit}
               onTeam={() => { setTeamForm({ user_id: availableUsers[0]?.id ?? "", role: "TECHNICIAN" }); setDialog("team"); }}
@@ -404,6 +424,7 @@ export default function WorkOrdersPage() {
               onClose={() => setDialog("close")}
               onReopen={() => setDialog("reopen")}
               onRemoveParticipant={(participantId) => void removeTeamMember(participantId)}
+              onChecklist={(itemId, completed, version) => void toggleChecklist(itemId, completed, version)}
             />
           ) : <EmptyState title="Sin detalle disponible" detail="No hay una intervencion activa en esta vista." />}
         </aside>
@@ -463,7 +484,7 @@ export default function WorkOrdersPage() {
   );
 }
 
-function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, canComplete, canNote, acting, onEdit, onTeam, onNote, onStart, onPause, onComplete, onValidate, onClose, onReopen, onRemoveParticipant }: {
+function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, canComplete, canNote, canChecklist, acting, onEdit, onTeam, onNote, onStart, onPause, onComplete, onValidate, onClose, onReopen, onRemoveParticipant, onChecklist }: {
   detail: WorkOrderDetail;
   userId?: string;
   isManager: boolean;
@@ -471,6 +492,7 @@ function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, c
   canPause: boolean;
   canComplete: boolean;
   canNote: boolean;
+  canChecklist: boolean;
   acting: string;
   onEdit: () => void;
   onTeam: () => void;
@@ -482,6 +504,7 @@ function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, c
   onClose: () => void;
   onReopen: () => void;
   onRemoveParticipant: (participantId: string) => void;
+  onChecklist: (itemId: string, completed: boolean, version: number) => void;
 }) {
   const hasPreviousSession = detail.sessions.some((item) => item.user_id === userId);
   const activeParticipants = detail.participants.filter((item) => item.active);
@@ -516,6 +539,11 @@ function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, c
         {(detail.work_performed || detail.failure_cause || detail.root_cause || detail.resolution) && <div className="mt-5 grid gap-4 sm:grid-cols-2"><DetailText label="Trabajo realizado" value={detail.work_performed} /><DetailText label="Causa" value={detail.failure_cause} /><DetailText label="Causa raiz" value={detail.root_cause} /><DetailText label="Solucion" value={detail.resolution} /></div>}
       </section>
 
+      {detail.checklist_items.length > 0 && <section className="border-b border-[var(--line)] p-5">
+        <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><ClipboardCheck size={17} className="text-[var(--accent)]" /><h3 className="text-sm font-bold">Checklist</h3></div><span className="text-xs font-bold text-[var(--muted)]">{detail.checklist_items.filter((item) => item.completed_at).length}/{detail.checklist_items.length}</span></div>
+        <div className="mt-3 space-y-2">{detail.checklist_items.map((item) => { const completed = Boolean(item.completed_at); return <button key={item.id} type="button" className={`flex min-h-12 w-full items-start gap-3 rounded-md border px-3 py-2.5 text-left ${completed ? "border-emerald-200 bg-emerald-50" : "border-[var(--line)] bg-white"}`} onClick={() => onChecklist(item.id, !completed, item.version)} disabled={!canChecklist || acting === `checklist-${item.id}`}><span className={`mt-0.5 grid size-6 shrink-0 place-items-center rounded ${completed ? "bg-emerald-600 text-white" : "border border-[var(--line)] text-[var(--muted)]"}`}>{completed ? <CheckCircle2 size={15} /> : item.position}</span><span className="min-w-0 flex-1"><span className={`block text-sm font-semibold ${completed ? "text-emerald-900" : "text-[var(--ink)]"}`}>{item.title}{item.required && <span className="ml-1 text-red-700">*</span>}</span>{item.instructions && <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">{item.instructions}</span>}{completed && <span className="mt-1 block text-[10px] font-semibold text-emerald-800">{item.completer?.full_name ?? "Usuario historico"} - {formatDate(item.completed_at, true)}</span>}</span></button>; })}</div>
+      </section>}
+
       <section className="border-b border-[var(--line)] p-5">
         <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Users size={17} className="text-[var(--accent)]" /><h3 className="text-sm font-bold">Equipo</h3><span className="text-xs text-[var(--muted)]">{activeParticipants.length}</span></div>{isManager && teamEditable && <button className="icon-button" onClick={onTeam} aria-label="Incorporar participante" title="Incorporar"><UserPlus size={16} /></button>}</div>
         <div className="mt-3 divide-y divide-[var(--line)]">
@@ -533,7 +561,7 @@ function WorkOrderDetailPanel({ detail, userId, isManager, canStart, canPause, c
 }
 
 function TimelineIcon({ type }: { type: WorkOrderEventType }) {
-  const Icon = type === "STARTED" || type === "RESUMED" ? Play : type === "PAUSED" ? Pause : type === "COMPLETED" || type === "CLOSED" ? CheckCircle2 : type === "VALIDATED" ? ShieldCheck : type === "PARTICIPANT_ADDED" || type === "ASSIGNED" ? UserPlus : type === "REOPENED" ? RotateCcw : type === "UPDATED" ? Pencil : Wrench;
+  const Icon = type === "STARTED" || type === "RESUMED" ? Play : type === "PAUSED" ? Pause : type === "COMPLETED" || type === "CLOSED" ? CheckCircle2 : type === "VALIDATED" ? ShieldCheck : type === "PARTICIPANT_ADDED" || type === "ASSIGNED" ? UserPlus : type === "REOPENED" ? RotateCcw : type === "UPDATED" ? Pencil : type === "CHECKLIST_UPDATED" ? ClipboardCheck : Wrench;
   return <Icon className="shrink-0 text-[var(--muted)]" size={13} />;
 }
 

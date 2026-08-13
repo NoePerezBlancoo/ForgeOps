@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum,
     ForeignKey,
@@ -19,6 +20,45 @@ from app.core.enums import FrequencyType, Priority
 from app.core.mixins import TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 
+class ChecklistTemplate(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
+    __tablename__ = "checklist_templates"
+    __table_args__ = (
+        UniqueConstraint("company_id", "name", name="uq_checklist_template_company_name"),
+        Index("ix_checklist_template_company_active", "company_id", "active"),
+    )
+
+    name: Mapped[str] = mapped_column(String(180), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    items: Mapped[list["ChecklistTemplateItem"]] = relationship(
+        back_populates="template",
+        cascade="all, delete-orphan",
+        order_by="ChecklistTemplateItem.position",
+        passive_deletes=True,
+    )
+
+
+class ChecklistTemplateItem(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
+    __tablename__ = "checklist_template_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "template_id", "position", name="uq_checklist_template_item_template_position"
+        ),
+        CheckConstraint("position >= 1", name="ck_checklist_template_item_position"),
+    )
+
+    template_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("checklist_templates.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    instructions: Mapped[str | None] = mapped_column(Text)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    template: Mapped["ChecklistTemplate"] = relationship(back_populates="items")
+
+
 class PreventivePlan(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     __tablename__ = "preventive_plans"
     __table_args__ = (
@@ -32,6 +72,9 @@ class PreventivePlan(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     )
     assigned_to: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    checklist_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("checklist_templates.id", ondelete="SET NULL"), index=True
     )
     name: Mapped[str] = mapped_column(String(180), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -51,6 +94,7 @@ class PreventivePlan(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
 
     asset: Mapped["Asset"] = relationship()  # noqa: F821
     assignee: Mapped["User | None"] = relationship()  # noqa: F821
+    checklist_template: Mapped[ChecklistTemplate | None] = relationship()
     work_orders: Mapped[list["WorkOrder"]] = relationship(  # noqa: F821
         back_populates="preventive_plan"
     )

@@ -7,17 +7,24 @@ from app.auth.dependencies import get_current_user, require_module, require_role
 from app.core.database import get_db
 from app.core.enums import CompanyModule, UserRole
 from app.maintenance.schemas import (
+    ChecklistTemplateCreate,
+    ChecklistTemplateRead,
+    ChecklistTemplateUpdate,
     GenerationSummary,
     PreventivePlanCreate,
     PreventivePlanRead,
     PreventivePlanUpdate,
 )
 from app.maintenance.service import (
+    create_checklist_template,
     create_plan,
     generate_due_work_orders,
     generate_work_order,
+    get_checklist_template,
     get_plan,
+    list_checklist_templates,
     list_plans,
+    update_checklist_template,
     update_plan,
 )
 from app.users.models import User
@@ -29,6 +36,49 @@ router = APIRouter(
     dependencies=[Depends(require_module(CompanyModule.PREVENTIVE))],
 )
 managers = require_roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAINTENANCE_MANAGER)
+
+
+@router.get("/checklists/templates", response_model=list[ChecklistTemplateRead])
+def checklist_index(
+    active: bool | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return list_checklist_templates(db, current_user.company_id, active)
+
+
+@router.get("/checklists/templates/{template_id}", response_model=ChecklistTemplateRead)
+def checklist_show(
+    template_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return get_checklist_template(db, current_user.company_id, template_id)
+
+
+@router.post(
+    "/checklists/templates",
+    response_model=ChecklistTemplateRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def checklist_store(
+    payload: ChecklistTemplateCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(managers),
+):
+    return create_checklist_template(db, current_user.company_id, payload)
+
+
+@router.patch(
+    "/checklists/templates/{template_id}", response_model=ChecklistTemplateRead
+)
+def checklist_update(
+    template_id: uuid.UUID,
+    payload: ChecklistTemplateUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(managers),
+):
+    return update_checklist_template(db, current_user.company_id, template_id, payload)
 
 
 @router.get("", response_model=list[PreventivePlanRead])

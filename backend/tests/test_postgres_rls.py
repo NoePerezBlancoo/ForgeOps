@@ -8,15 +8,26 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
+from app.assets.models import Asset
 from app.auth.security import hash_password
 from app.companies.models import Company
 from app.core.config import settings
 from app.core.database import set_database_context
-from app.core.enums import NotificationType, UserRole
+from app.core.enums import (
+    AssetStatus,
+    Criticality,
+    NotificationType,
+    Priority,
+    UserRole,
+    WorkOrderStatus,
+    WorkOrderType,
+)
 from app.invitations.models import UserInvitation
+from app.maintenance.models import ChecklistTemplate, ChecklistTemplateItem
 from app.notifications.models import Notification
 from app.plants.models import Plant
 from app.users.models import User
+from app.work_orders.models import WorkOrder, WorkOrderChecklistItem
 
 DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not DATABASE_URL, reason="Requiere PostgreSQL migrado")
@@ -197,6 +208,145 @@ def test_invitations_and_notifications_enforce_tenant_and_recipient_boundaries()
             invitations[1].id,
         }
         assert list(db.scalars(select(Notification.id))) == []
+    finally:
+        db.rollback()
+        if transaction.is_active:
+            transaction.rollback()
+        db.close()
+        connection.close()
+        engine.dispose()
+
+
+def test_preventive_checklists_enforce_tenant_boundaries():
+    engine = _runtime_engine()
+    connection = engine.connect()
+    transaction = connection.begin()
+    db = Session(bind=connection, expire_on_commit=False)
+    suffix = uuid.uuid4().hex[:8]
+    try:
+        set_database_context(db, "system")
+        companies = [
+            Company(name=f"Checklist {label} {suffix}", tax_id=f"CHK-{label}-{suffix}")
+            for label in ("A", "B")
+        ]
+        db.add_all(companies)
+        db.flush()
+        plants = [
+            Plant(company_id=company.id, name=f"Plant {index}", code=f"C{index}{suffix}")
+            for index, company in enumerate(companies, start=1)
+        ]
+        users = [
+            User(
+                company_id=company.id,
+                full_name=f"Checklist Admin {index}",
+                email=f"checklist-{index}-{suffix}@rls.local",
+                password_hash=hash_password("RlsSecure123!"),
+                role=UserRole.ADMIN,
+            )
+            for index, company in enumerate(companies, start=1)
+        ]
+        db.add_all([*plants, *users])
+        db.flush()
+        assets = [
+            Asset(
+                company_id=company.id,
+                plant_id=plant.id,
+                code=f"CHK-{index}-{suffix}",
+                name=f"Checklist asset {index}",
+                status=AssetStatus.ACTIVE,
+                criticality=Criticality.HIGH,
+            )
+            for index, (company, plant) in enumerate(
+                zip(companies, plants, strict=True), start=1
+            )
+        ]
+        templates = [
+            ChecklistTemplate(
+                company_id=company.id,
+                name=f"Checklist {index}",
+                active=True,
+            )
+            for index, company in enumerate(companies, start=1)
+        ]
+        db.add_all([*assets, *templates])
+        db.flush()
+        template_items = [
+            ChecklistTemplateItem(
+                company_id=company.id,
+                template_id=template.id,
+                title="Tenant-specific check",
+                position=1,
+                required=True,
+            )
+            for company, template in zip(companies, templates, strict=True)
+        ]
+        orders = [
+            WorkOrder(
+                company_id=company.id,
+                plant_id=plant.id,
+                asset_id=asset.id,
+                created_by=user.id,
+                number=f"CHK-{index}-{suffix}",
+                title="RLS checklist order",
+                description="Order used to verify checklist row isolation.",
+                type=WorkOrderType.PREVENTIVE,
+                priority=Priority.MEDIUM,
+                status=WorkOrderStatus.OPEN,
+            )
+            for index, (company, plant, asset, user) in enumerate(
+                zip(companies, plants, assets, users, strict=True), start=1
+            )
+        ]
+        db.add_all([*template_items, *orders])
+        db.flush()
+        snapshots = [
+            WorkOrderChecklistItem(
+                company_id=company.id,
+                work_order_id=order.id,
+                source_template_item_id=item.id,
+                title=item.title,
+                position=1,
+                required=True,
+            )
+            for company, order, item in zip(
+                companies, orders, template_items, strict=True
+            )
+        ]
+        db.add_all(snapshots)
+        db.flush()
+        template_ids = {template.id for template in templates}
+        item_ids = {item.id for item in template_items}
+        snapshot_ids = {snapshot.id for snapshot in snapshots}
+        db.expunge_all()
+
+        set_database_context(db, "tenant", companies[0].id)
+        assert set(db.scalars(select(ChecklistTemplate.id).where(
+            ChecklistTemplate.id.in_(template_ids)
+        ))) == {templates[0].id}
+        assert set(db.scalars(select(ChecklistTemplateItem.id).where(
+            ChecklistTemplateItem.id.in_(item_ids)
+        ))) == {template_items[0].id}
+        assert set(db.scalars(select(WorkOrderChecklistItem.id).where(
+            WorkOrderChecklistItem.id.in_(snapshot_ids)
+        ))) == {snapshots[0].id}
+
+        db.expunge_all()
+        set_database_context(db, "auth")
+        assert not list(db.scalars(select(ChecklistTemplate.id).where(
+            ChecklistTemplate.id.in_(template_ids)
+        )))
+        assert not list(db.scalars(select(WorkOrderChecklistItem.id).where(
+            WorkOrderChecklistItem.id.in_(snapshot_ids)
+        )))
+
+        db.expunge_all()
+        set_database_context(db, "platform")
+        assert set(db.scalars(select(ChecklistTemplate.id).where(
+            ChecklistTemplate.id.in_(template_ids)
+        ))) == template_ids
+        assert set(db.scalars(select(WorkOrderChecklistItem.id).where(
+            WorkOrderChecklistItem.id.in_(snapshot_ids)
+        ))) == snapshot_ids
     finally:
         db.rollback()
         if transaction.is_active:

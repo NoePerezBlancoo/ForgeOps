@@ -8,7 +8,7 @@ from app.incidents.models import Incident
 from app.inventory.models import InventoryItem, InventoryMovement
 from app.invitations.models import UserInvitation
 from app.jobs.models import BackgroundJob
-from app.maintenance.models import PreventivePlan
+from app.maintenance.models import ChecklistTemplate, ChecklistTemplateItem, PreventivePlan
 from app.notifications.models import Notification
 from app.onboarding.models import OnboardingProgress
 from app.operators.models import OperatorAuditEvent, OperatorSession, PlatformOperator
@@ -16,6 +16,7 @@ from app.plants.models import Plant
 from app.users.models import User
 from app.work_orders.models import (
     WorkOrder,
+    WorkOrderChecklistItem,
     WorkOrderEvent,
     WorkOrderNote,
     WorkOrderParticipant,
@@ -45,8 +46,11 @@ __all__ = [
     "TechnicalDocument",
     "User",
     "WorkOrder",
+    "WorkOrderChecklistItem",
     "WorkOrderEvent",
     "WorkOrderNote",
     "WorkOrderParticipant",
     "WorkSession",
+    "ChecklistTemplate",
+    "ChecklistTemplateItem",
 ]

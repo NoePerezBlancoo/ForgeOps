@@ -50,6 +50,7 @@ export type WorkOrderEventType =
   | "PAUSED"
   | "RESUMED"
   | "NOTE_ADDED"
+  | "CHECKLIST_UPDATED"
   | "STATUS_CHANGED"
   | "COMPLETED"
   | "VALIDATED"
@@ -463,6 +464,24 @@ export interface WorkOrderEvent {
   actor: Pick<User, "id" | "full_name" | "email"> | null;
 }
 
+export interface WorkOrderChecklistItem {
+  id: string;
+  company_id: string;
+  work_order_id: string;
+  source_template_item_id: string | null;
+  title: string;
+  instructions: string | null;
+  position: number;
+  required: boolean;
+  completed_by: string | null;
+  completed_at: string | null;
+  notes: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  completer: Pick<User, "id" | "full_name" | "email"> | null;
+}
+
 export interface WorkOrderDetail extends WorkOrder {
   validator: Pick<User, "id" | "full_name" | "email"> | null;
   closer: Pick<User, "id" | "full_name" | "email"> | null;
@@ -470,6 +489,7 @@ export interface WorkOrderDetail extends WorkOrder {
   sessions: WorkSession[];
   notes: WorkOrderNote[];
   events: WorkOrderEvent[];
+  checklist_items: WorkOrderChecklistItem[];
 }
 
 export interface DashboardData {
@@ -516,6 +536,7 @@ export interface PreventivePlan {
   company_id: string;
   asset_id: string;
   assigned_to: string | null;
+  checklist_template_id: string | null;
   name: string;
   description: string;
   frequency_type: FrequencyType;
@@ -529,6 +550,30 @@ export interface PreventivePlan {
   updated_at: string;
   asset: Pick<Asset, "id" | "code" | "name">;
   assignee: Pick<User, "id" | "full_name" | "email"> | null;
+  checklist_template: ChecklistTemplate | null;
+}
+
+export interface ChecklistTemplateItem {
+  id: string;
+  company_id: string;
+  template_id: string;
+  title: string;
+  instructions: string | null;
+  position: number;
+  required: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChecklistTemplate {
+  id: string;
+  company_id: string;
+  name: string;
+  description: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  items: ChecklistTemplateItem[];
 }
 
 export interface InventoryItem {

@@ -1,6 +1,9 @@
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import select
+
 from app.documents.storage import LocalDocumentStorage, get_document_storage
+from app.users.models import User
 from tests.conftest import login
 
 
@@ -10,15 +13,45 @@ def _first_asset(client, headers):
     return response.json()[0]
 
 
-def test_preventive_plan_generates_only_one_pending_order(client):
+def test_preventive_plan_generates_only_one_pending_order(client, database):
     headers = login(client, "admin@alpha.local", "Admin123!")
+    beta_headers = login(client, "admin@beta.local", "Admin123!")
     asset = _first_asset(client, headers)
+    admin = database.scalar(select(User).where(User.email == "admin@alpha.local"))
+    template_response = client.post(
+        "/api/v1/preventive-maintenance/checklists/templates",
+        headers=headers,
+        json={
+            "name": "Revision mensual de compresor",
+            "description": "Comprobaciones de seguridad y operacion.",
+            "items": [
+                {
+                    "title": "Comprobar nivel de aceite",
+                    "instructions": "Registrar fugas antes de rellenar.",
+                    "position": 1,
+                    "required": True,
+                },
+                {
+                    "title": "Registrar temperatura",
+                    "position": 2,
+                    "required": False,
+                },
+            ],
+        },
+    )
+    assert template_response.status_code == 201
+    template = template_response.json()
+    assert client.get(
+        f"/api/v1/preventive-maintenance/checklists/templates/{template['id']}",
+        headers=beta_headers,
+    ).status_code == 404
     response = client.post(
         "/api/v1/preventive-maintenance",
         headers=headers,
         json={
             "asset_id": asset["id"],
-            "assigned_to": None,
+            "assigned_to": str(admin.id),
+            "checklist_template_id": template["id"],
             "name": "Revision mensual de seguridad",
             "description": "Comprobar protecciones, enclavamientos y parada de emergencia.",
             "frequency_type": "MONTHS",
@@ -39,6 +72,63 @@ def test_preventive_plan_generates_only_one_pending_order(client):
     assert generated.status_code == 200
     assert generated.json()["type"] == "PREVENTIVE"
     assert generated.json()["preventive_plan_id"] == plan["id"]
+    order_id = generated.json()["id"]
+    detail = client.get(f"/api/v1/work-orders/{order_id}", headers=headers)
+    assert detail.status_code == 200
+    assert [item["title"] for item in detail.json()["checklist_items"]] == [
+        "Comprobar nivel de aceite",
+        "Registrar temperatura",
+    ]
+
+    updated_template = client.patch(
+        f"/api/v1/preventive-maintenance/checklists/templates/{template['id']}",
+        headers=headers,
+        json={
+            "items": [
+                {
+                    "title": "Nuevo paso para futuras ordenes",
+                    "position": 1,
+                    "required": True,
+                }
+            ]
+        },
+    )
+    assert updated_template.status_code == 200
+    assert client.get(
+        f"/api/v1/work-orders/{order_id}", headers=headers
+    ).json()["checklist_items"][0]["title"] == "Comprobar nivel de aceite"
+
+    assert client.post(
+        f"/api/v1/work-orders/{order_id}/start", headers=headers, json={}
+    ).status_code == 200
+    blocked_completion = client.post(
+        f"/api/v1/work-orders/{order_id}/complete",
+        headers=headers,
+        json={"work_performed": "Revision preventiva realizada segun procedimiento."},
+    )
+    assert blocked_completion.status_code == 409
+    required_item = detail.json()["checklist_items"][0]
+    checked = client.patch(
+        f"/api/v1/work-orders/{order_id}/checklist/{required_item['id']}",
+        headers=headers,
+        json={"completed": True, "notes": "Nivel correcto", "version": 1},
+    )
+    assert checked.status_code == 200
+    checked_item = checked.json()["checklist_items"][0]
+    assert checked_item["completed_by"] == str(admin.id)
+    assert checked_item["version"] == 2
+    assert client.patch(
+        f"/api/v1/work-orders/{order_id}/checklist/{required_item['id']}",
+        headers=headers,
+        json={"completed": False, "version": 1},
+    ).status_code == 409
+    completed = client.post(
+        f"/api/v1/work-orders/{order_id}/complete",
+        headers=headers,
+        json={"work_performed": "Revision preventiva realizada segun procedimiento."},
+    )
+    assert completed.status_code == 200
+    assert completed.json()["status"] == "PENDING_VALIDATION"
 
     duplicate = client.post(
         f"/api/v1/preventive-maintenance/{plan['id']}/generate-work-order",

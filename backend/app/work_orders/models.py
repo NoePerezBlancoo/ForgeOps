@@ -134,6 +134,51 @@ class WorkOrder(UUIDPrimaryKeyMixin, TenantMixin, Base):
         order_by="WorkOrderEvent.sequence_no",
         passive_deletes=True,
     )
+    checklist_items: Mapped[list["WorkOrderChecklistItem"]] = relationship(
+        back_populates="work_order",
+        cascade="all, delete-orphan",
+        order_by="WorkOrderChecklistItem.position",
+        passive_deletes=True,
+    )
+
+    __mapper_args__ = {"version_id_col": version}
+
+
+class WorkOrderChecklistItem(UUIDPrimaryKeyMixin, TenantMixin, Base):
+    __tablename__ = "work_order_checklist_items"
+    __table_args__ = (
+        UniqueConstraint("work_order_id", "position", name="uq_work_order_checklist_item_position"),
+        CheckConstraint("position >= 1", name="ck_work_order_checklist_item_position"),
+        Index("ix_work_order_checklist_item_completed", "work_order_id", "completed_at"),
+        Index("ix_work_order_checklist_item_order_position", "work_order_id", "position"),
+    )
+
+    work_order_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("work_orders.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_template_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("checklist_template_items.id", ondelete="SET NULL"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    instructions: Mapped[str | None] = mapped_column(Text)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    completed_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notes: Mapped[str | None] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    work_order: Mapped[WorkOrder] = relationship(back_populates="checklist_items")
+    source_template_item: Mapped["ChecklistTemplateItem | None"] = relationship()  # noqa: F821
+    completer: Mapped["User | None"] = relationship(foreign_keys=[completed_by])  # noqa: F821
 
     __mapper_args__ = {"version_id_col": version}
 
