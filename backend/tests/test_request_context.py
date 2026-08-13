@@ -68,3 +68,13 @@ def test_client_ip_returns_none_when_both_addresses_missing():
         assert get_client_ip(request) is None
     finally:
         settings.client_ip_source = previous
+
+
+def test_client_ip_strips_forwarded_address_whitespace():
+    previous = settings.client_ip_source
+    settings.client_ip_source = "x-real-ip"
+    try:
+        request = build_request(client="10.0.0.7", real_ip=" 203.0.113.8 ")
+        assert get_client_ip(request) == "203.0.113.8"
+    finally:
+        settings.client_ip_source = previous
