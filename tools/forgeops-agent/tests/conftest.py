@@ -57,8 +57,42 @@ def make_config(repo: Path) -> OrchestratorConfig:
         agent_image="forgeops-local-agent:test",
         gateway_image="forgeops-ollama-gateway:test",
         agent_version="0.86.0",
-        primary_model="test-model",
-        fallback_model=None,
+        model_catalog={
+            "qwen": {
+                "provider": "ollama",
+                "model": "qwen-test",
+                "role": "throughput",
+            },
+            "devstral": {
+                "provider": "ollama",
+                "model": "devstral-test",
+                "role": "precision",
+            },
+        },
+        routing_policy={
+            "LOW": {
+                "primary": "qwen",
+                "fallback": "devstral",
+                "allowed": ["auto", "qwen", "devstral"],
+            },
+            "MEDIUM": {
+                "primary": "qwen",
+                "fallback": "devstral",
+                "allowed": ["auto", "qwen", "devstral"],
+            },
+            "HIGH": {
+                "local_execution": "restricted",
+                "primary": "devstral",
+                "fallback": None,
+                "allowed": ["auto", "devstral"],
+            },
+            "CRITICAL": {
+                "local_execution": "forbidden",
+                "allowed": ["auto"],
+            },
+        },
+        fallback_statuses=("FAILED", "FAILED_TESTS"),
+        max_model_attempts=2,
         ollama_url="http://127.0.0.1:11434",
         context_tokens=32768,
         max_parallel_tasks=1,

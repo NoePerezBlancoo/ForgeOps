@@ -9,7 +9,7 @@ from pathlib import Path
 
 from forgeops_agent.checks import CheckRunner
 from forgeops_agent.config import OrchestratorConfig
-from forgeops_agent.errors import PolicyError
+from forgeops_agent.errors import AgentError, PolicyError
 from forgeops_agent.git import (
     assert_agent_branch,
     branch_for,
@@ -22,9 +22,16 @@ from forgeops_agent.git import (
     run_git,
 )
 from forgeops_agent.locks import FileLock
-from forgeops_agent.models import TERMINAL_STATUSES, Task, TaskState, TaskStatus
+from forgeops_agent.models import (
+    TERMINAL_STATUSES,
+    RunnerResult,
+    Task,
+    TaskState,
+    TaskStatus,
+)
 from forgeops_agent.policy import scan_secrets, validate_changed_paths, validate_task_policy
 from forgeops_agent.reports import write_review_package, write_task_report
+from forgeops_agent.routing import ModelRouter
 from forgeops_agent.runner import AiderRunner
 from forgeops_agent.store import TaskStore
 from forgeops_agent.system import resource_snapshot, resource_violations
@@ -36,6 +43,7 @@ class Orchestrator:
         self.store = TaskStore(config.ai_root)
         if config.agent_provider != "aider":
             raise PolicyError(f"Unsupported local agent provider: {config.agent_provider}")
+        self.router = ModelRouter(config)
         self.runner = AiderRunner(config)
         self.checks = CheckRunner(config.repo_root)
 
@@ -79,13 +87,21 @@ class Orchestrator:
         if violations:
             raise PolicyError("Resource guard blocked task: " + "; ".join(violations))
 
+        decision = self.router.route(task, state.next_model_override)
+
         state.status = TaskStatus.RUNNING
         state.attempts += 1
         state.started_at = datetime.now(UTC).isoformat()
         state.finished_at = None
         state.last_action = "preparing isolated worktree"
-        state.model = self.config.primary_model
+        state.model = decision.primary_model
+        state.routing_primary = decision.primary_model
+        state.routing_fallback = decision.fallback_model
+        state.routing_reason = decision.reason
+        state.next_model_override = None
         state.error = None
+        state.test_status = "NOT_RUN"
+        state.check_results = []
         self.store.save_state(state)
         self.store.move(task.id, "running")
         self._write_status(state, resources)
@@ -93,123 +109,246 @@ class Orchestrator:
         try:
             worktree = self._prepare_worktree(task, state)
             assert_agent_branch(worktree, self.config.protected_branches)
-            if state.base_commit and head_commit(worktree) != state.base_commit:
+            if state.base_commit and head_commit(worktree) not in {
+                state.base_commit,
+                state.commit,
+            }:
                 raise PolicyError("Agent branch contains an unvalidated commit")
-            prompt = self._write_prompt(task, state, worktree)
-            models = [self.config.primary_model]
-            if (
-                self.config.fallback_model
-                and self.config.fallback_model != self.config.primary_model
-            ):
-                models.append(self.config.fallback_model)
-            paths: list[str] = []
-            for index, model in enumerate(models):
+            automatic_feedback: str | None = None
+            for model_attempt in range(1, decision.max_model_attempts + 1):
+                model_alias = (
+                    decision.primary_alias
+                    if model_attempt == 1
+                    else decision.fallback_alias
+                )
+                if not model_alias:
+                    break
+                model = self.router.model_name(model_alias)
                 state.model = model
                 state.last_action = f"local agent running ({model})"
                 self.store.save_state(state)
                 self._write_status(state, resource_snapshot(self.config.repo_root))
-                log_model = re.sub(r"[^a-z0-9]+", "-", model.lower()).strip("-")
-                result = self.runner.run(
+                prompt = self._write_prompt(
                     task,
+                    state,
                     worktree,
-                    prompt,
-                    self.config.ai_root / "logs" / f"{task.id}-{log_model}.log",
-                    model,
+                    automatic_feedback=automatic_feedback,
                 )
+                log_model = re.sub(r"[^a-z0-9]+", "-", model.lower()).strip("-")
+                log_path = self.config.ai_root / "logs" / (
+                    f"{task.id}-run-{state.attempts}-model-{model_attempt}-{log_model}.log"
+                )
+                attempt_started = time.monotonic()
+                attempt_base = head_commit(worktree)
+                resources_before = resource_snapshot(self.config.repo_root)
+                try:
+                    result = self.runner.run(
+                        task,
+                        worktree,
+                        prompt,
+                        log_path,
+                        model,
+                    )
+                except AgentError as exc:
+                    result = RunnerResult(
+                        return_code=1,
+                        timed_out=False,
+                        stopped=False,
+                        duration_seconds=time.monotonic() - attempt_started,
+                        log_path=str(log_path),
+                        summary=str(exc),
+                    )
+                attempt_paths = changed_files(worktree, attempt_base)
+                paths = changed_files(worktree, state.base_commit or "HEAD")
+                state.changed_files = paths
                 if result.timed_out:
+                    self._record_attempt(
+                        state,
+                        model_alias,
+                        model,
+                        TaskStatus.TIMEOUT,
+                        "Task timeout reached",
+                        [],
+                        result,
+                        attempt_started,
+                        resources_before,
+                        is_fallback=model_attempt > 1,
+                    )
                     return self._finish(
                         task, state, TaskStatus.TIMEOUT, "Task timeout reached"
                     )
                 if result.stopped:
+                    self._record_attempt(
+                        state,
+                        model_alias,
+                        model,
+                        TaskStatus.CANCELLED,
+                        "Kill switch activated",
+                        [],
+                        result,
+                        attempt_started,
+                        resources_before,
+                        is_fallback=model_attempt > 1,
+                    )
                     return self._finish(
                         task, state, TaskStatus.CANCELLED, "Kill switch activated"
                     )
-                paths = changed_files(worktree, state.base_commit or "HEAD")
-                if result.return_code == 0 and paths:
-                    break
-                if paths or index == len(models) - 1:
-                    detail = (
-                        f"Agent exited with {result.return_code}: {result.summary[-1000:]}"
-                        if result.return_code != 0
-                        else "Agent produced no changes"
+
+                failure_status: TaskStatus | None = None
+                failure_reason: str | None = None
+                checks = []
+                if paths:
+                    state.last_action = "validating changed paths"
+                    path_policy = validate_changed_paths(
+                        task, paths, self.config.protected_path_prefixes
                     )
-                    return self._finish(task, state, TaskStatus.FAILED, detail)
-                state.last_action = f"trying fallback after no changes from {model}"
+                    security = scan_secrets(worktree, paths)
+                    if not path_policy.valid:
+                        failure_status = TaskStatus.FAILED_POLICY
+                        failure_reason = "; ".join(path_policy.violations)
+                    elif not security.valid:
+                        failure_status = TaskStatus.FAILED_SECURITY
+                        failure_reason = "; ".join(security.violations)
+
+                if failure_status is None and result.return_code != 0:
+                    failure_status = TaskStatus.FAILED
+                    failure_reason = (
+                        f"Agent exited with {result.return_code}: {result.summary[-1000:]}"
+                    )
+                elif failure_status is None and not attempt_paths:
+                    failure_status = TaskStatus.FAILED
+                    failure_reason = "Agent produced no changes"
+
+                if failure_status is None:
+                    state.last_action = "applying deterministic formatting"
+                    self.store.save_state(state)
+                    checks = self.checks.format_changed_python(task.id, worktree, paths)
+                    if not all(item.passed for item in checks):
+                        failure = next(item for item in checks if not item.passed)
+                        failure_status = TaskStatus.FAILED_TESTS
+                        failure_reason = f"{failure.name}: {failure.summary}"
+
+                if failure_status is None:
+                    paths = changed_files(worktree, state.base_commit or "HEAD")
+                    state.changed_files = paths
+                    path_policy = validate_changed_paths(
+                        task, paths, self.config.protected_path_prefixes
+                    )
+                    security = scan_secrets(worktree, paths)
+                    if not path_policy.valid:
+                        failure_status = TaskStatus.FAILED_POLICY
+                        failure_reason = "; ".join(path_policy.violations)
+                    elif not security.valid:
+                        failure_status = TaskStatus.FAILED_SECURITY
+                        failure_reason = "; ".join(security.violations)
+
+                if failure_status is None:
+                    state.last_action = "running quality checks"
+                    self.store.save_state(state)
+                    checks.extend(self.checks.run_all(task, worktree, paths))
+                    if not all(item.passed for item in checks):
+                        failure = next(item for item in checks if not item.passed)
+                        failure_status = TaskStatus.FAILED_TESTS
+                        failure_reason = f"{failure.name}: {failure.summary}"
+
+                state.check_results = [asdict(item) for item in checks]
+                state.test_status = (
+                    "PASS"
+                    if failure_status is None and all(item.passed for item in checks)
+                    else "FAIL"
+                )
+                if failure_status is None:
+                    self._record_attempt(
+                        state,
+                        model_alias,
+                        model,
+                        TaskStatus.COMPLETED,
+                        None,
+                        checks,
+                        result,
+                        attempt_started,
+                        resources_before,
+                        is_fallback=model_attempt > 1,
+                    )
+                    if task.allow_commit:
+                        state.last_action = "creating validated local commit"
+                        state.commit = commit_changes(
+                            worktree, task.id, task.title, state.changed_files
+                        )
+                    return self._finish(task, state, TaskStatus.COMPLETED)
+
+                use_fallback = self.router.should_fallback(
+                    decision, failure_status, model_attempt
+                )
+                retry_reason = failure_reason if use_fallback else None
+                self._record_attempt(
+                    state,
+                    model_alias,
+                    model,
+                    failure_status,
+                    failure_reason,
+                    checks,
+                    result,
+                    attempt_started,
+                    resources_before,
+                    retry_reason=retry_reason,
+                    is_fallback=model_attempt > 1,
+                )
+                if not use_fallback:
+                    return self._finish(task, state, failure_status, failure_reason)
+                state.fallback_used = True
+                state.fallback_reason = failure_reason
+                automatic_feedback = (
+                    "The previous model failed a trusted gate. Correct the existing scoped "
+                    f"work without bypassing checks. Failure: {failure_reason}"
+                )
+                state.last_action = f"routing fallback to {decision.fallback_model}"
                 self.store.save_state(state)
 
-            state.last_action = "validating changed paths"
-            state.changed_files = paths
-            path_policy = validate_changed_paths(
-                task, paths, self.config.protected_path_prefixes
+            return self._finish(
+                task,
+                state,
+                TaskStatus.FAILED,
+                "Configured model attempts were exhausted",
             )
-            if not path_policy.valid:
-                return self._finish(
-                    task,
-                    state,
-                    TaskStatus.FAILED_POLICY,
-                    "; ".join(path_policy.violations),
-                )
-            security = scan_secrets(worktree, paths)
-            if not security.valid:
-                return self._finish(
-                    task,
-                    state,
-                    TaskStatus.FAILED_SECURITY,
-                    "; ".join(security.violations),
-                )
-
-            state.last_action = "applying deterministic formatting"
-            self.store.save_state(state)
-            checks = self.checks.format_changed_python(task.id, worktree, paths)
-            if not all(item.passed for item in checks):
-                state.check_results = [asdict(item) for item in checks]
-                state.test_status = "FAIL"
-                failure = next(item for item in checks if not item.passed)
-                return self._finish(
-                    task,
-                    state,
-                    TaskStatus.FAILED_TESTS,
-                    f"{failure.name}: {failure.summary}",
-                )
-            paths = changed_files(worktree, state.base_commit or "HEAD")
-            state.changed_files = paths
-            path_policy = validate_changed_paths(
-                task, paths, self.config.protected_path_prefixes
-            )
-            security = scan_secrets(worktree, paths)
-            if not path_policy.valid:
-                return self._finish(
-                    task,
-                    state,
-                    TaskStatus.FAILED_POLICY,
-                    "; ".join(path_policy.violations),
-                )
-            if not security.valid:
-                return self._finish(
-                    task,
-                    state,
-                    TaskStatus.FAILED_SECURITY,
-                    "; ".join(security.violations),
-                )
-            state.last_action = "running quality checks"
-            self.store.save_state(state)
-            checks.extend(self.checks.run_all(task, worktree, paths))
-            state.check_results = [asdict(item) for item in checks]
-            state.test_status = "PASS" if all(item.passed for item in checks) else "FAIL"
-            if not all(item.passed for item in checks):
-                failure = next(item for item in checks if not item.passed)
-                return self._finish(
-                    task,
-                    state,
-                    TaskStatus.FAILED_TESTS,
-                    f"{failure.name}: {failure.summary}",
-                )
-            if task.allow_commit:
-                state.last_action = "creating validated local commit"
-                state.commit = commit_changes(worktree, task.id, task.title, paths)
-            return self._finish(task, state, TaskStatus.COMPLETED)
         except Exception as exc:
             return self._finish(task, state, TaskStatus.FAILED, str(exc))
+
+    def _record_attempt(
+        self,
+        state: TaskState,
+        model_alias: str,
+        model: str,
+        status: TaskStatus,
+        reason: str | None,
+        checks,
+        result,
+        started: float,
+        resources_before: dict,
+        *,
+        retry_reason: str | None = None,
+        is_fallback: bool = False,
+    ) -> None:
+        state.attempt_history.append(
+            {
+                "attempt": len(state.attempt_history) + 1,
+                "task_run": state.attempts,
+                "model_alias": model_alias,
+                "model": model,
+                "duration_seconds": round(time.monotonic() - started, 2),
+                "agent_duration_seconds": round(result.duration_seconds, 2),
+                "status": status.value,
+                "checks": [asdict(item) for item in checks],
+                "reason": reason,
+                "reason_for_retry": retry_reason,
+                "is_fallback": is_fallback,
+                "generated_tokens": result.generated_tokens,
+                "tokens_per_second": result.tokens_per_second,
+                "resources_before": resources_before,
+                "resources_after": resource_snapshot(self.config.repo_root),
+            }
+        )
+        self.store.save_state(state)
 
     def _prepare_worktree(self, task: Task, state: TaskState) -> Path:
         if state.worktree and Path(state.worktree).exists():
@@ -223,7 +362,14 @@ class Orchestrator:
         self.store.save_state(state)
         return worktree
 
-    def _write_prompt(self, task: Task, state: TaskState, worktree: Path) -> Path:
+    def _write_prompt(
+        self,
+        task: Task,
+        state: TaskState,
+        worktree: Path,
+        *,
+        automatic_feedback: str | None = None,
+    ) -> Path:
         task_state = self.config.ai_root / "state" / task.id
         task_state.mkdir(parents=True, exist_ok=True)
         feedback_path = task_state / "feedback.md"
@@ -263,6 +409,10 @@ Implementation instructions:
 Codex feedback from a previous attempt:
 
 {feedback}
+
+Automatic supervisor feedback from the previous model:
+
+{automatic_feedback or 'None'}
 
 Work only inside `/workspace`. Do not create commits. Finish after implementing and locally inspecting the scoped change.
 """
@@ -315,17 +465,33 @@ Work only inside `/workspace`. Do not create commits. Finish after implementing 
                         return
                     time.sleep(self.config.idle_poll_seconds)
 
-    def retry(self, task_id: str, feedback_path: Path) -> TaskState:
+    def retry(
+        self,
+        task_id: str,
+        feedback_path: Path,
+        model_override: str | None = None,
+    ) -> TaskState:
         task = self.store.load_task(task_id)
         state = self.store.load_state(task.id)
         if state.attempts >= task.max_attempts:
             raise PolicyError("Task retry limit reached")
+        if model_override:
+            decision = self.router.route(task, model_override)
+            state.next_model_override = decision.primary_alias
+            if decision.primary_alias == "devstral" and any(
+                item.get("model_alias") == "qwen" for item in state.attempt_history
+            ):
+                state.fallback_used = True
+                state.fallback_reason = "Codex requested a Devstral quality retry"
         feedback = feedback_path.read_text(encoding="utf-8")
         destination = self.config.ai_root / "state" / task.id / "feedback.md"
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(feedback, encoding="utf-8")
         state.status = TaskStatus.QUEUED
         state.error = None
+        state.codex_correction_required = True
+        state.retry_count += 1
+        state.last_action = "queued for Codex-requested correction"
         self.store.save_state(state)
         self.store.move(task.id, "queue")
         return state

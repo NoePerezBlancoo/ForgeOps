@@ -13,4 +13,5 @@ allow_push: false
 allow_merge: false
 allow_network: false
 risk: HIGH
+preferred_model: devstral
 depends_on: []

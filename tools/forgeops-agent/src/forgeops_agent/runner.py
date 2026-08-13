@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import queue
+import re
 import subprocess
 import threading
 import time
@@ -15,6 +16,9 @@ from forgeops_agent.system import safe_host_environment
 
 ISOLATED_NETWORK = "forgeops-ai-isolated"
 GATEWAY_CONTAINER = "forgeops-ai-ollama-gateway"
+RECEIVED_TOKENS = re.compile(
+    r"Tokens:\s+[\d,.]+[kKmM]?\s+sent,\s+([\d,.]+[kKmM]?)\s+received"
+)
 
 
 class LocalAgentRunner(ABC):
@@ -45,12 +49,34 @@ class AiderRunner(LocalAgentRunner):
     def doctor(self) -> dict[str, object]:
         docker = self._run(["docker", "version", "--format", "{{.Server.Version}}"], check=False)
         image = self._run(["docker", "image", "inspect", self.config.agent_image], check=False)
+        gateway = self._run(
+            ["docker", "inspect", "-f", "{{.State.Running}}", GATEWAY_CONTAINER],
+            check=False,
+        )
+        networks = self._run(
+            [
+                "docker",
+                "inspect",
+                "-f",
+                "{{json .NetworkSettings.Networks}}",
+                GATEWAY_CONTAINER,
+            ],
+            check=False,
+        )
+        gateway_running = gateway.returncode == 0 and gateway.stdout.strip() == "true"
+        gateway_isolated = (
+            networks.returncode == 0
+            and ISOLATED_NETWORK in json.loads(networks.stdout or "{}")
+        )
         return {
             "provider": "aider",
             "version": self.config.agent_version,
             "docker": docker.stdout.strip() if docker.returncode == 0 else None,
             "agent_image_ready": image.returncode == 0,
             "network_isolation": ISOLATED_NETWORK,
+            "gateway_running": gateway_running,
+            "gateway_isolated_network": gateway_isolated,
+            "gateway_ready": gateway_running and gateway_isolated,
         }
 
     def ensure_runtime(self) -> None:
@@ -320,7 +346,9 @@ class AiderRunner(LocalAgentRunner):
             self._drain(lines, log, output)
         self._truncate_log(log_path)
         duration = time.monotonic() - started
+        joined_output = "".join(output)
         summary = "".join(output[-25:])[-4000:].strip() or "No agent output"
+        generated_tokens = self._generated_tokens(joined_output)
         return RunnerResult(
             return_code=process.returncode or 0,
             timed_out=timed_out,
@@ -328,7 +356,30 @@ class AiderRunner(LocalAgentRunner):
             duration_seconds=duration,
             log_path=str(log_path),
             summary=summary,
+            generated_tokens=generated_tokens,
+            tokens_per_second=(
+                round(generated_tokens / duration, 2)
+                if generated_tokens is not None and duration > 0
+                else None
+            ),
         )
+
+    @classmethod
+    def _generated_tokens(cls, output: str) -> int | None:
+        values = [cls._token_count(match) for match in RECEIVED_TOKENS.findall(output)]
+        return sum(values) if values else None
+
+    @staticmethod
+    def _token_count(value: str) -> int:
+        normalized = value.replace(",", "").lower()
+        multiplier = 1
+        if normalized.endswith("k"):
+            multiplier = 1_000
+            normalized = normalized[:-1]
+        elif normalized.endswith("m"):
+            multiplier = 1_000_000
+            normalized = normalized[:-1]
+        return round(float(normalized) * multiplier)
 
     @staticmethod
     def _drain(lines: queue.Queue[str | None], log, output: list[str]) -> None:

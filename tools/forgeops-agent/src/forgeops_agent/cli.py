@@ -15,6 +15,7 @@ from forgeops_agent.benchmark import benchmark_models
 from forgeops_agent.config import OrchestratorConfig
 from forgeops_agent.errors import AgentError
 from forgeops_agent.git import compact_diff
+from forgeops_agent.metrics import aggregate_metrics
 from forgeops_agent.models import TaskStatus
 from forgeops_agent.orchestrator import Orchestrator
 from forgeops_agent.policy import scan_secrets, validate_changed_paths
@@ -34,6 +35,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     commands.add_parser("doctor")
     commands.add_parser("models")
+    commands.add_parser("routing")
+    commands.add_parser("metrics")
     benchmark = commands.add_parser("benchmark")
     benchmark.add_argument("--model", action="append", dest="models")
 
@@ -64,6 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
     retry = commands.add_parser("retry")
     retry.add_argument("task_id")
     retry.add_argument("--feedback", required=True, type=Path)
+    retry.add_argument("--model", choices=("qwen", "devstral"))
     cancel = commands.add_parser("cancel")
     cancel.add_argument("task_id")
     cleanup = commands.add_parser("cleanup")
@@ -108,19 +112,22 @@ def dispatch(args, config: OrchestratorConfig, orchestrator: Orchestrator) -> in
         print_json(doctor(config, orchestrator))
         return 0
     if command == "models":
-        with urlopen(f"{config.ollama_url.rstrip('/')}/api/tags", timeout=10) as response:
-            payload = json.load(response)
+        installed = ollama_inventory(config, required=True)
         print_json(
             {
-                "primary": config.primary_model,
-                "fallback": config.fallback_model,
                 "context_tokens": config.context_tokens,
-                "installed": [
-                    {"name": item["name"], "size_gb": round(item["size"] / 1024**3, 2)}
-                    for item in payload.get("models", [])
+                "models": [
+                    model_status(alias, definition, installed, orchestrator)
+                    for alias, definition in config.model_catalog.items()
                 ],
             }
         )
+        return 0
+    if command == "routing":
+        print_json(orchestrator.router.describe())
+        return 0
+    if command == "metrics":
+        print_json(aggregate_metrics(config.ai_root / "state"))
         return 0
     if command == "benchmark":
         models = args.models or [
@@ -197,7 +204,13 @@ def dispatch(args, config: OrchestratorConfig, orchestrator: Orchestrator) -> in
         print(orchestrator.review_package(args.task_id))
         return 0
     if command == "retry":
-        print_json(orchestrator.retry(args.task_id, args.feedback.resolve()).to_dict())
+        print_json(
+            orchestrator.retry(
+                args.task_id,
+                args.feedback.resolve(),
+                model_override=args.model,
+            ).to_dict()
+        )
         return 0
     if command == "cancel":
         print_json(orchestrator.cancel(args.task_id).to_dict())
@@ -251,7 +264,14 @@ def risk_flags(args) -> dict[str, bool]:
 
 
 def doctor(config: OrchestratorConfig, orchestrator: Orchestrator) -> dict[str, object]:
-    return {
+    installed = ollama_inventory(config, required=False)
+    model_readiness = {
+        alias: str(definition["model"]) in installed
+        for alias, definition in config.model_catalog.items()
+    }
+    agent = orchestrator.runner.doctor()
+    version = ollama_version(config.ollama_url)
+    payload = {
         "orchestrator_version": __version__,
         "repository": str(config.repo_root),
         "platform": platform.platform(),
@@ -271,12 +291,71 @@ def doctor(config: OrchestratorConfig, orchestrator: Orchestrator) -> dict[str, 
         },
         "ollama": {
             "url": config.ollama_url,
-            "version": ollama_version(config.ollama_url),
+            "version": version,
             "primary_model": config.primary_model,
+            "fallback_model": config.fallback_model,
+            "model_readiness": model_readiness,
             "context_tokens": config.context_tokens,
         },
-        "agent": orchestrator.runner.doctor(),
+        "routing": {
+            "valid": True,
+            "low_primary": config.primary_model,
+            "low_fallback": config.fallback_model,
+            "max_model_attempts": config.max_model_attempts,
+        },
+        "agent": agent,
         "kill_switch": (config.ai_root / "STOP").exists(),
+    }
+    payload["ready"] = bool(
+        version
+        and all(model_readiness.values())
+        and agent.get("agent_image_ready")
+        and agent.get("gateway_ready")
+        and not payload["kill_switch"]
+    )
+    return payload
+
+
+def ollama_inventory(
+    config: OrchestratorConfig,
+    *,
+    required: bool,
+) -> dict[str, dict]:
+    try:
+        with urlopen(f"{config.ollama_url.rstrip('/')}/api/tags", timeout=10) as response:
+            payload = json.load(response)
+    except (OSError, ValueError) as exc:
+        if required:
+            raise AgentError(f"Cannot read local Ollama model inventory: {exc}") from exc
+        return {}
+    return {
+        str(item.get("name") or item.get("model")): item
+        for item in payload.get("models", [])
+    }
+
+
+def model_status(
+    alias: str,
+    definition: dict,
+    installed: dict[str, dict],
+    orchestrator: Orchestrator,
+) -> dict[str, object]:
+    model = str(definition["model"])
+    item = installed.get(model)
+    assignments: list[str] = []
+    for risk, policy in orchestrator.router.describe()["routing"].items():
+        if policy.get("primary") == alias:
+            assignments.append(f"{risk}_PRIMARY")
+        if policy.get("fallback") == alias:
+            assignments.append(f"{risk}_FALLBACK")
+    return {
+        "alias": alias,
+        "label": definition.get("label", alias),
+        "model": model,
+        "role": str(definition["role"]).upper(),
+        "assignment": assignments,
+        "status": "READY" if item else "MISSING",
+        "size_gb": round(item["size"] / 1024**3, 2) if item else None,
     }
 
 
@@ -293,7 +372,7 @@ def write_benchmark_report(ai_root: Path, result: dict) -> None:
             for case in model["cases"]
         )
         sections.append(
-            f"## {model['model']}\n\nQuality: {model['quality_score']}\n\nAverage speed: {model['average_tokens_per_second']} tok/s\n\n{cases}"
+            f"## {model['model']}\n\nQuality: {model['quality_score']}\n\nAverage speed: {model['average_tokens_per_second']} tok/s\n\nRelative speed: {model.get('relative_speed') or 'N/A'}x\n\n{cases}"
         )
     markdown = f"""# Local model benchmark
 

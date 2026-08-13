@@ -22,6 +22,7 @@
     "allow_merge": { "const": false },
     "allow_network": { "type": "boolean" },
     "risk": { "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+    "preferred_model": { "enum": ["auto", "qwen", "devstral"] },
     "depends_on": { "type": "array", "items": { "type": "string", "pattern": "^AI-[0-9]{4,}$" } },
     "context_files": { "type": "array", "items": { "type": "string" } }
   }

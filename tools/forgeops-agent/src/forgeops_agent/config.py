@@ -42,8 +42,10 @@ class OrchestratorConfig:
     agent_image: str
     gateway_image: str
     agent_version: str
-    primary_model: str
-    fallback_model: str | None
+    model_catalog: dict[str, dict[str, Any]]
+    routing_policy: dict[str, dict[str, Any]]
+    fallback_statuses: tuple[str, ...]
+    max_model_attempts: int
     ollama_url: str
     context_tokens: int
     max_parallel_tasks: int
@@ -83,8 +85,16 @@ class OrchestratorConfig:
                 agent_image=data["agent"]["image"],
                 gateway_image=data["agent"]["gateway_image"],
                 agent_version=str(data["agent"]["version"]),
-                primary_model=models["selection"]["primary"],
-                fallback_model=models["selection"].get("fallback"),
+                model_catalog={
+                    str(alias).lower(): dict(definition)
+                    for alias, definition in models["models"].items()
+                },
+                routing_policy={
+                    str(risk).upper(): dict(policy)
+                    for risk, policy in models["routing"].items()
+                },
+                fallback_statuses=tuple(models["fallback"]["retryable_statuses"]),
+                max_model_attempts=int(models["limits"]["max_model_attempts"]),
                 ollama_url=models["ollama"]["host_url"],
                 context_tokens=int(models["ollama"]["context_tokens"]),
                 max_parallel_tasks=int(data["execution"]["max_parallel_tasks"]),
@@ -104,3 +114,13 @@ class OrchestratorConfig:
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ConfigurationError(f"Invalid orchestrator configuration: {exc}") from exc
+
+    @property
+    def primary_model(self) -> str:
+        alias = str(self.routing_policy["LOW"]["primary"]).lower()
+        return str(self.model_catalog[alias]["model"])
+
+    @property
+    def fallback_model(self) -> str | None:
+        alias = self.routing_policy["LOW"].get("fallback")
+        return str(self.model_catalog[str(alias).lower()]["model"]) if alias else None

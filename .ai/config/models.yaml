@@ -1,20 +1,61 @@
-version: 1
+version: 2
 
 ollama:
   host_url: http://127.0.0.1:11434
   context_tokens: 32768
   keep_alive: 10m
 
-selection:
-  primary: devstral-small-2:24b
-  fallback: qwen3-coder:30b
+models:
+  qwen:
+    provider: ollama
+    model: qwen3-coder:30b
+    label: Qwen3-Coder 30B
+    role: throughput
+  devstral:
+    provider: ollama
+    model: devstral-small-2:24b
+    label: Devstral Small 2 24B
+    role: precision
 
-candidates:
-  - name: qwen3-coder:30b
-    size_gb: 19
-    native_context: 262144
-    role: agentic coding
-  - name: devstral-small-2:24b
-    size_gb: 15
-    native_context: 393216
-    role: repository exploration and tool use
+routing:
+  LOW:
+    local_execution: allowed
+    primary: qwen
+    fallback: devstral
+    allowed:
+      - auto
+      - qwen
+      - devstral
+    reason: Qwen is the configured throughput model for bounded LOW-risk implementation.
+    override_reason: Codex explicitly selected a permitted model for this LOW-risk task.
+  MEDIUM:
+    local_execution: allowed_with_codex_override
+    primary: qwen
+    fallback: devstral
+    allowed:
+      - auto
+      - qwen
+      - devstral
+    reason: Qwen handles bounded MEDIUM work by default; Devstral recovers failed gates.
+    override_reason: Codex explicitly selected a permitted model for this MEDIUM-risk task.
+  HIGH:
+    local_execution: restricted
+    primary: devstral
+    fallback: null
+    allowed:
+      - auto
+      - devstral
+    reason: HIGH-risk delegation is restricted to scoped mechanical work under Codex ownership.
+    override_reason: Codex explicitly selected Devstral for restricted HIGH-risk mechanical work.
+  CRITICAL:
+    local_execution: forbidden
+    allowed:
+      - auto
+
+fallback:
+  retryable_statuses:
+    - FAILED
+    - FAILED_TESTS
+
+limits:
+  max_model_attempts: 2

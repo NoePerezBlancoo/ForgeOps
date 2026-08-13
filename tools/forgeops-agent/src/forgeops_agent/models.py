@@ -23,6 +23,7 @@ TASK_FIELDS = {
     "allow_merge",
     "allow_network",
     "risk",
+    "preferred_model",
     "depends_on",
     "context_files",
 }
@@ -33,6 +34,12 @@ class Risk(StrEnum):
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
     CRITICAL = "CRITICAL"
+
+
+class PreferredModel(StrEnum):
+    AUTO = "auto"
+    QWEN = "qwen"
+    DEVSTRAL = "devstral"
 
 
 class TaskStatus(StrEnum):
@@ -90,6 +97,7 @@ class Task:
     allow_merge: bool = False
     allow_network: bool = False
     risk: Risk = Risk.LOW
+    preferred_model: PreferredModel = PreferredModel.AUTO
     depends_on: tuple[str, ...] = ()
     context_files: tuple[str, ...] = ()
 
@@ -130,6 +138,13 @@ class Task:
             risk = Risk(risk_value)
         except ValueError as exc:
             raise ConfigurationError(f"Invalid task risk: {risk_value}") from exc
+        preferred_value = str(data.get("preferred_model", "auto")).lower()
+        try:
+            preferred_model = PreferredModel(preferred_value)
+        except ValueError as exc:
+            raise ConfigurationError(
+                f"Invalid preferred_model: {preferred_value}"
+            ) from exc
         task = cls(
             id=task_id,
             title=str(data["title"]).strip(),
@@ -146,6 +161,7 @@ class Task:
             allow_merge=cls._boolean_field(data, "allow_merge", False),
             allow_network=cls._boolean_field(data, "allow_network", False),
             risk=risk,
+            preferred_model=preferred_model,
             depends_on=depends_on,
             context_files=context_files,
         )
@@ -188,12 +204,11 @@ class Task:
             raise ConfigurationError("timeout_minutes must be between 5 and 480")
         if self.allow_push or self.allow_merge:
             raise ConfigurationError("Automatic push and merge are disabled in V1")
-        if self.risk is Risk.CRITICAL:
-            raise ConfigurationError("CRITICAL tasks cannot be delegated")
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["risk"] = self.risk.value
+        data["preferred_model"] = self.preferred_model.value
         for key in (
             "allowed_paths",
             "forbidden_paths",
@@ -222,6 +237,15 @@ class TaskState:
     model: str | None = None
     changed_files: list[str] = field(default_factory=list)
     check_results: list[dict[str, Any]] = field(default_factory=list)
+    routing_primary: str | None = None
+    routing_fallback: str | None = None
+    routing_reason: str | None = None
+    fallback_used: bool = False
+    fallback_reason: str | None = None
+    attempt_history: list[dict[str, Any]] = field(default_factory=list)
+    codex_correction_required: bool = False
+    retry_count: int = 0
+    next_model_override: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TaskState:
@@ -243,6 +267,8 @@ class RunnerResult:
     duration_seconds: float
     log_path: str
     summary: str
+    generated_tokens: int | None = None
+    tokens_per_second: float | None = None
 
 
 @dataclass(frozen=True)

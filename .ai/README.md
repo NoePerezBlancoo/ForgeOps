@@ -13,3 +13,5 @@ Start with:
 ```
 
 Configuration and templates are versioned. Runtime state, logs, task reports, locks, prompts and the `.ai/STOP` kill switch remain local.
+
+LOW tasks route to Qwen3-Coder for throughput and can fall back once to Devstral after a recoverable agent or quality-gate failure. Security, scope and policy failures never fall back. Run `forgeops-agent routing` for the active policy and `forgeops-agent metrics` for first-pass acceptance data.

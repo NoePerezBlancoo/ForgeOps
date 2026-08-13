@@ -15,6 +15,7 @@ allow_push: false
 allow_merge: false
 allow_network: false
 risk: LOW
+preferred_model: auto
 depends_on: []
 context_files:
   - backend/app/incidents/

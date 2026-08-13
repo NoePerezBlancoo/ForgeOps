@@ -4,7 +4,7 @@ import pytest
 import yaml
 
 from forgeops_agent.errors import ConfigurationError, PolicyError
-from forgeops_agent.models import Risk, Task
+from forgeops_agent.models import PreferredModel, Risk, Task
 from forgeops_agent.policy import scan_secrets, validate_changed_paths, validate_task_policy
 
 
@@ -21,6 +21,22 @@ def test_task_parser_normalizes_paths():
     assert task.id == "AI-0042"
     assert task.allowed_paths == ("docs/local-ai/",)
     assert task.risk is Risk.LOW
+    assert task.preferred_model is PreferredModel.AUTO
+
+
+def test_task_parser_accepts_explicit_precision_model():
+    task = Task.from_dict(
+        {
+            "id": "AI-0043",
+            "title": "Delicate business tests",
+            "objective": "Add tests for one bounded business rule under Codex review.",
+            "allowed_paths": ["backend/tests/"],
+            "risk": "MEDIUM",
+            "preferred_model": "devstral",
+        }
+    )
+
+    assert task.preferred_model is PreferredModel.DEVSTRAL
 
 
 @pytest.mark.parametrize(
@@ -72,17 +88,18 @@ def test_task_parser_rejects_unsafe_paths(path: str):
         )
 
 
-def test_critical_task_is_rejected():
-    with pytest.raises(ConfigurationError, match="CRITICAL"):
-        Task.from_dict(
-            {
-                "id": "AI-0042",
-                "title": "Production operation",
-                "objective": "Attempt a production operation that must never be delegated.",
-                "allowed_paths": ["docs/"],
-                "risk": "CRITICAL",
-            }
-        )
+def test_critical_task_is_parsed_but_rejected_by_policy():
+    task = Task.from_dict(
+        {
+            "id": "AI-0042",
+            "title": "Production operation",
+            "objective": "Attempt a production operation that must never be delegated.",
+            "allowed_paths": ["docs/"],
+            "risk": "CRITICAL",
+        }
+    )
+    with pytest.raises(PolicyError, match="CRITICAL"):
+        validate_task_policy(task, ("deploy/",), allow_medium=True, allow_high=True)
 
 
 def test_medium_and_high_tasks_require_explicit_override(sample_task):

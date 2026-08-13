@@ -36,3 +36,9 @@ def test_aider_accepts_explicit_new_editable_file(tmp_path: Path):
     )
 
     assert files == ["frontend/components/new-form.tsx"]
+
+
+def test_aider_extracts_generated_tokens_from_output():
+    output = "Tokens: 2.2k sent, 895 received.\nTokens: 100 sent, 1.1k received."
+
+    assert AiderRunner._generated_tokens(output) == 1995

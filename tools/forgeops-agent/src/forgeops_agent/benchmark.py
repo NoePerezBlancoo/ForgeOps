@@ -149,19 +149,39 @@ def benchmark_models(
             {"model": model, "keep_alive": 0},
             timeout=60,
         )
-    ranked = sorted(
+    measured_speeds = [
+        item["average_tokens_per_second"]
+        for item in results
+        if item["average_tokens_per_second"]
+    ]
+    baseline_speed = min(measured_speeds) if measured_speeds else None
+    for item in results:
+        speed = item["average_tokens_per_second"]
+        item["relative_speed"] = (
+            round(speed / baseline_speed, 2) if speed and baseline_speed else None
+        )
+    throughput_ranked = sorted(
         results,
-        key=lambda item: (
-            item["quality_score"],
-            item["average_tokens_per_second"] or 0,
-        ),
+        key=lambda item: item["average_tokens_per_second"] or 0,
         reverse=True,
+    )
+    quality_ranked = sorted(
+        results,
+        key=lambda item: item["quality_score"],
+        reverse=True,
+    )
+    primary = throughput_ranked[0]["model"]
+    precision = next(
+        (item["model"] for item in quality_ranked if item["model"] != primary),
+        None,
     )
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "context_tokens": context_tokens,
-        "primary": ranked[0]["model"],
-        "fallback": ranked[1]["model"] if len(ranked) > 1 else None,
-        "selection_method": "Highest controlled quality score; speed breaks ties",
+        "primary": primary,
+        "fallback": precision,
+        "selection_method": (
+            "Throughput selects the primary model; controlled quality selects the precision fallback"
+        ),
         "models": results,
     }

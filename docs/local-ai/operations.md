@@ -19,7 +19,7 @@ For changed backend Python files, the supervisor applies deterministic Ruff impo
 For corrections:
 
 ```powershell
-.\scripts\forgeops-agent.ps1 retry AI-0001 --feedback feedback.md
+.\scripts\forgeops-agent.ps1 retry AI-0001 --model devstral --feedback feedback.md
 .\scripts\forgeops-agent.ps1 run AI-0001
 ```
 
@@ -43,11 +43,15 @@ Runtime status is written to `.ai/status.json`. Logs rotate to a bounded 10 MB t
 ollama list
 ollama ps
 .\scripts\forgeops-agent.ps1 models
+.\scripts\forgeops-agent.ps1 routing
+.\scripts\forgeops-agent.ps1 metrics
 .\scripts\forgeops-agent.ps1 benchmark
 ollama rm MODEL_NAME
 ```
 
 Models are never removed automatically.
+
+`models` reports readiness and routing roles. `routing` prints the configured risk policy. `metrics` reports task counts, model attempts, fallback rate, Codex corrections and first-pass acceptance without estimating Codex token equivalents. Metrics are observational and never tune routing automatically.
 
 ## Optional startup
 

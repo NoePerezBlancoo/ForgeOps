@@ -12,4 +12,5 @@ allow_push: false
 allow_merge: false
 allow_network: false
 risk: MEDIUM
+preferred_model: auto
 depends_on: []
