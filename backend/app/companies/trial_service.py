@@ -32,6 +32,7 @@ from app.maintenance.models import PreventivePlan
 from app.plants.models import Plant
 from app.users.models import User
 from app.work_orders.models import WorkOrder
+from app.work_orders.service import initialize_work_order_history
 
 
 def register_trial(db: Session, payload: TrialRegistration) -> User:
@@ -172,50 +173,54 @@ def _add_sample_data(
     db.add(incident)
     db.flush()
 
-    db.add_all(
-        [
-            WorkOrder(
-                company_id=company.id,
-                plant_id=plant.id,
-                asset_id=assets[1].id,
-                incident_id=incident.id,
-                created_by=user.id,
-                number="OT-0001",
-                title="Diagnosticar parada intermitente",
-                description="Revisar sensores, seguridades y secuencia del automatismo.",
-                type=WorkOrderType.CORRECTIVE,
-                priority=Priority.HIGH,
-                status=WorkOrderStatus.OPEN,
-                scheduled_date=now + timedelta(days=1),
-                estimated_duration=90,
-            ),
-            WorkOrder(
-                company_id=company.id,
-                plant_id=plant.id,
-                asset_id=assets[0].id,
-                created_by=user.id,
-                number="OT-0002",
-                title="Revision inicial del compresor",
-                description="Comprobar niveles, filtros, fugas y parametros de servicio.",
-                type=WorkOrderType.INSPECTION,
-                priority=Priority.MEDIUM,
-                status=WorkOrderStatus.ASSIGNED,
-                scheduled_date=now + timedelta(days=3),
-                estimated_duration=60,
-            ),
-            PreventivePlan(
-                company_id=company.id,
-                asset_id=assets[0].id,
-                name="Revision mensual del compresor",
-                description="Inspeccion de niveles, filtros, fugas y temperatura de trabajo.",
-                frequency_type=FrequencyType.MONTHS,
-                frequency_value=1,
-                next_execution=now + timedelta(days=14),
-                estimated_duration=60,
-                priority=Priority.HIGH,
-                active=True,
-            ),
-        ]
+    work_orders = [
+        WorkOrder(
+            company_id=company.id,
+            plant_id=plant.id,
+            asset_id=assets[1].id,
+            incident_id=incident.id,
+            created_by=user.id,
+            number="OT-0001",
+            title="Diagnosticar parada intermitente",
+            description="Revisar sensores, seguridades y secuencia del automatismo.",
+            type=WorkOrderType.CORRECTIVE,
+            priority=Priority.HIGH,
+            status=WorkOrderStatus.OPEN,
+            scheduled_date=now + timedelta(days=1),
+            estimated_duration=90,
+        ),
+        WorkOrder(
+            company_id=company.id,
+            plant_id=plant.id,
+            asset_id=assets[0].id,
+            assigned_to=user.id,
+            created_by=user.id,
+            number="OT-0002",
+            title="Revision inicial del compresor",
+            description="Comprobar niveles, filtros, fugas y parametros de servicio.",
+            type=WorkOrderType.INSPECTION,
+            priority=Priority.MEDIUM,
+            status=WorkOrderStatus.ASSIGNED,
+            scheduled_date=now + timedelta(days=3),
+            estimated_duration=60,
+        ),
+    ]
+    db.add_all(work_orders)
+    for order in work_orders:
+        initialize_work_order_history(db, order, user)
+    db.add(
+        PreventivePlan(
+            company_id=company.id,
+            asset_id=assets[0].id,
+            name="Revision mensual del compresor",
+            description="Inspeccion de niveles, filtros, fugas y temperatura de trabajo.",
+            frequency_type=FrequencyType.MONTHS,
+            frequency_value=1,
+            next_execution=now + timedelta(days=14),
+            estimated_duration=60,
+            priority=Priority.HIGH,
+            active=True,
+        )
     )
 
     items = [

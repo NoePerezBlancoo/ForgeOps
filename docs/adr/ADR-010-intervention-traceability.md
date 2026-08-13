@@ -2,7 +2,7 @@
 
 ## Estado
 
-Aceptada para implementar en Phase C.
+Aceptada e implementada en Phase C.
 
 ## Contexto
 

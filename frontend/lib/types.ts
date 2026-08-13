@@ -32,9 +32,29 @@ export type WorkOrderStatus =
   | "ASSIGNED"
   | "IN_PROGRESS"
   | "WAITING"
+  | "PENDING_VALIDATION"
   | "COMPLETED"
+  | "CLOSED"
   | "CANCELLED";
 export type WorkOrderType = "CORRECTIVE" | "PREVENTIVE" | "INSPECTION" | "IMPROVEMENT";
+export type WorkOrderParticipantRole = "LEAD" | "TECHNICIAN" | "SUPPORT";
+export type WorkSessionEndReason = "PAUSED" | "COMPLETED" | "CANCELLED" | "REMOVED";
+export type WorkOrderNoteType = "COMMENT" | "MEASUREMENT" | "WORK_LOG" | "CAUSE" | "SOLUTION";
+export type WorkOrderEventType =
+  | "CREATED"
+  | "UPDATED"
+  | "ASSIGNED"
+  | "PARTICIPANT_ADDED"
+  | "PARTICIPANT_REMOVED"
+  | "STARTED"
+  | "PAUSED"
+  | "RESUMED"
+  | "NOTE_ADDED"
+  | "STATUS_CHANGED"
+  | "COMPLETED"
+  | "VALIDATED"
+  | "CLOSED"
+  | "REOPENED";
 export type FrequencyType = "DAYS" | "WEEKS" | "MONTHS" | "YEARS";
 export type InventoryMovementType = "RECEIPT" | "CONSUMPTION" | "ADJUSTMENT";
 export type DocumentType = "MANUAL" | "ELECTRICAL_SCHEMATIC" | "PROCEDURE" | "SAFETY" | "OTHER";
@@ -324,6 +344,8 @@ export interface WorkOrder {
   preventive_plan_id: string | null;
   assigned_to: string | null;
   created_by: string;
+  validated_by: string | null;
+  closed_by: string | null;
   number: string;
   title: string;
   description: string;
@@ -336,10 +358,69 @@ export interface WorkOrder {
   estimated_duration: number | null;
   real_duration: number | null;
   observations: string | null;
+  work_performed: string | null;
+  failure_cause: string | null;
+  root_cause: string | null;
+  resolution: string | null;
+  validated_at: string | null;
+  closed_at: string | null;
+  version: number;
   created_at: string;
+  updated_at: string;
   asset: Pick<Asset, "id" | "code" | "name">;
   assignee: Pick<User, "id" | "full_name" | "email"> | null;
   creator: Pick<User, "id" | "full_name" | "email">;
+}
+
+export interface WorkOrderParticipant {
+  id: string;
+  user_id: string;
+  assigned_by: string | null;
+  role: WorkOrderParticipantRole;
+  active: boolean;
+  joined_at: string;
+  removed_at: string | null;
+  user: Pick<User, "id" | "full_name" | "email">;
+  assigner: Pick<User, "id" | "full_name" | "email"> | null;
+}
+
+export interface WorkSession {
+  id: string;
+  user_id: string;
+  started_at: string;
+  ended_at: string | null;
+  ended_reason: WorkSessionEndReason | null;
+  duration_seconds: number | null;
+  user: Pick<User, "id" | "full_name" | "email">;
+}
+
+export interface WorkOrderNote {
+  id: string;
+  author_id: string | null;
+  note_type: WorkOrderNoteType;
+  body: string;
+  created_at: string;
+  author: Pick<User, "id" | "full_name" | "email"> | null;
+}
+
+export interface WorkOrderEvent {
+  id: string;
+  actor_id: string | null;
+  sequence_no: number;
+  event_type: WorkOrderEventType;
+  summary: string;
+  details: Record<string, unknown>;
+  occurred_at: string;
+  actor: Pick<User, "id" | "full_name" | "email"> | null;
+}
+
+export interface WorkOrderDetail extends WorkOrder {
+  validator: Pick<User, "id" | "full_name" | "email"> | null;
+  closer: Pick<User, "id" | "full_name" | "email"> | null;
+  participants: WorkOrderParticipant[];
+  sessions: WorkSession[];
+  notes: WorkOrderNote[];
+  events: WorkOrderEvent[];
 }
 
 export interface DashboardData {

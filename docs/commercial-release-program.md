@@ -23,7 +23,9 @@ Fecha de auditoria: 2026-08-13.
 | Redis y worker durable | `TESTED` | Jobs idempotentes, payload cifrado e integracion de worker |
 | Storage privado S3 | `TESTED` | Validacion de firma, claves por tenant y URLs firmadas |
 | Trial, onboarding y backoffice | `TESTED` | Flujos API y panel `/control` existentes |
+| Trazabilidad de intervenciones | `TESTED` | PostgreSQL real, ciclo multi-tecnico, permisos, historial inmutable y UI responsive |
 | PWA basica | `IMPLEMENTED` | Manifest, service worker, shell offline y cola local |
+| Railway staging V1.2.2 | `STAGING_VALIDATED` | Health, readiness, Redis, frontend y validador remoto comprobados |
 | Railway staging automatico | `EXTERNAL_BLOCKER` | Variable GitHub `RAILWAY_STAGING_ENABLED=false` |
 | Dominios finales | `EXTERNAL_BLOCKER` | Requiere dominio y cambios DNS del propietario |
 | SMTP real | `EXTERNAL_BLOCKER` | Requiere proveedor y credenciales |
@@ -36,18 +38,11 @@ Fecha de auditoria: 2026-08-13.
 | Fase | Epic | Resultado exigido | Estado |
 | --- | --- | --- | --- |
 | A | Local AI Orchestrator | Delegacion aislada, gates, metricas y flujo de revision | `TESTED` |
-| B | Production Foundation V1.2.3 | Version coherente, preflight, smoke tests, runbooks y gate de release | En curso |
-| C | Intervention Traceability | Timeline inmutable, varios tecnicos, sesiones, notas, estados y validacion | Pendiente |
-| D | Users and Notifications | Invitaciones, ciclo de usuario, notificaciones internas y correo | Pendiente |
-| E | Preventive Maintenance | Checklists reutilizables, recurrencias y ejecucion trazable | Pendiente |
-| F | Inventory Integration | Consumo transaccional por OT, stock, coste e historial | Pendiente |
-| G | Technician PWA | Flujo movil rapido, cola offline util y conflictos visibles | Pendiente |
-| H | Reporting | Parte PDF, KPIs operativos y dashboard accionable | Pendiente |
-| I | Product UX | Responsive 375/tablet/desktop, accesibilidad, estados y consistencia | Pendiente |
-| J | Commercial Readiness | Demo, tutorial, onboarding, ayuda, documentos cliente y sitio comercial | Pendiente |
-| K | Assurance | Auditoria de seguridad, rendimiento, carga y recuperacion | Pendiente |
-| L | Release Candidate | E2E critico, soak staging, cierre de riesgos y GO/NO-GO | Pendiente |
-| M | Production Release | Cutover autorizado, observacion y validacion productiva | Bloqueado hasta aprobacion |
+| B | Production Foundation V1.2.3 | Version coherente, preflight, smoke tests, runbooks y gate de release | `TESTED` |
+| C | Intervention Traceability | Historial inmutable, varios tecnicos, sesiones, notas, estados y validacion | `TESTED` |
+| M | Production Release | Cutover autorizado, observacion y validacion productiva | `EXTERNAL_BLOCKER` |
+
+La secuencia restante conserva este orden de dependencias: Users and Notifications, Preventive Maintenance, Inventory Integration, Technician PWA, Reporting, Product UX, Commercial Readiness, Assurance y Release Candidate. Cada fase recibira uno de los estados permitidos cuando exista implementacion o evidencia; no se asigna un estado anticipado.
 
 ## Backlog activo
 
@@ -68,6 +63,8 @@ Fecha de auditoria: 2026-08-13.
 - `AI-0205`: pruebas de API, aislamiento, permisos y tiempos por tecnico.
 - `AI-0206`: detalle de OT orientado a movil con acciones de una pulsacion.
 - `AI-0207`: timeline legible y gestion de participantes para responsables.
+
+Estado: `TESTED`. Validado con suite completa, PostgreSQL/RLS, migracion sobre datos existentes, build de produccion y revision visual a 390 y 1440 px.
 
 ### Phase D en adelante
 
@@ -92,4 +89,3 @@ Para convertir `IMPLEMENTED/TESTED` en `STAGING_VALIDATED/PRODUCTION_VALIDATED` 
 2. Confirmar plan de PostgreSQL, backups/PITR y bucket con retencion.
 3. Facilitar dominios/DNS, SMTP y observabilidad cuando se contraten.
 4. Autorizar expresamente el cutover de produccion.
-

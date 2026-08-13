@@ -26,7 +26,9 @@ def upgrade() -> None:
     op.add_column("work_orders", sa.Column("root_cause", sa.Text(), nullable=True))
     op.add_column("work_orders", sa.Column("resolution", sa.Text(), nullable=True))
     op.add_column("work_orders", sa.Column("validated_by", sa.Uuid(), nullable=True))
-    op.add_column("work_orders", sa.Column("validated_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "work_orders", sa.Column("validated_at", sa.DateTime(timezone=True), nullable=True)
+    )
     op.add_column("work_orders", sa.Column("closed_by", sa.Uuid(), nullable=True))
     op.add_column("work_orders", sa.Column("closed_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column(
@@ -35,7 +37,12 @@ def upgrade() -> None:
     )
     op.add_column(
         "work_orders",
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
     )
     op.create_foreign_key(
         "fk_work_orders_validated_by_users",
@@ -64,7 +71,9 @@ def upgrade() -> None:
         sa.Column("assigned_by", sa.Uuid(), nullable=True),
         sa.Column("role", sa.String(length=24), nullable=False),
         sa.Column("active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
-        sa.Column("joined_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "joined_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+        ),
         sa.Column("removed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.ForeignKeyConstraint(["assigned_by"], ["users.id"], ondelete="SET NULL"),
@@ -100,9 +109,19 @@ def upgrade() -> None:
         sa.Column("duration_seconds", sa.Integer(), nullable=True),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.ForeignKeyConstraint(["company_id"], ["companies.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["participant_id"], ["work_order_participants.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["participant_id"], ["work_order_participants.id"], ondelete="CASCADE"
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["work_order_id"], ["work_orders.id"], ondelete="CASCADE"),
+        sa.CheckConstraint(
+            "duration_seconds IS NULL OR duration_seconds >= 0",
+            name="ck_work_sessions_non_negative_duration",
+        ),
+        sa.CheckConstraint(
+            "ended_at IS NULL OR ended_at >= started_at",
+            name="ck_work_sessions_valid_interval",
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_work_sessions_company_id", "work_sessions", ["company_id"])
@@ -129,7 +148,12 @@ def upgrade() -> None:
         sa.Column("author_id", sa.Uuid(), nullable=True),
         sa.Column("note_type", sa.String(length=24), nullable=False),
         sa.Column("body", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.ForeignKeyConstraint(["author_id"], ["users.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["company_id"], ["companies.id"], ondelete="CASCADE"),
@@ -150,7 +174,12 @@ def upgrade() -> None:
         sa.Column("event_type", sa.String(length=40), nullable=False),
         sa.Column("summary", sa.String(length=255), nullable=False),
         sa.Column("details", sa.JSON(), nullable=False),
-        sa.Column("occurred_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "occurred_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.ForeignKeyConstraint(["actor_id"], ["users.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["company_id"], ["companies.id"], ondelete="CASCADE"),

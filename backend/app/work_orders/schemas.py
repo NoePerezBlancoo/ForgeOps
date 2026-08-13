@@ -1,9 +1,17 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
-from app.core.enums import Priority, WorkOrderStatus, WorkOrderType
+from app.core.enums import (
+    Priority,
+    WorkOrderEventType,
+    WorkOrderNoteType,
+    WorkOrderParticipantRole,
+    WorkOrderStatus,
+    WorkOrderType,
+    WorkSessionEndReason,
+)
 from app.core.schemas import AssetSummary, ORMModel, UserSummary
 
 
@@ -16,7 +24,6 @@ class WorkOrderCreate(BaseModel):
     description: str = Field(min_length=10, max_length=5000)
     type: WorkOrderType = WorkOrderType.CORRECTIVE
     priority: Priority = Priority.MEDIUM
-    status: WorkOrderStatus = WorkOrderStatus.OPEN
     scheduled_date: datetime | None = None
     estimated_duration: int | None = Field(default=None, ge=1, le=10080)
     observations: str | None = Field(default=None, max_length=4000)
@@ -28,17 +35,9 @@ class WorkOrderUpdate(BaseModel):
     description: str | None = Field(default=None, min_length=10, max_length=5000)
     type: WorkOrderType | None = None
     priority: Priority | None = None
-    status: WorkOrderStatus | None = None
     scheduled_date: datetime | None = None
     estimated_duration: int | None = Field(default=None, ge=1, le=10080)
-    real_duration: int | None = Field(default=None, ge=1, le=10080)
     observations: str | None = Field(default=None, max_length=4000)
-
-    @model_validator(mode="after")
-    def validate_completion(self):
-        if self.status == WorkOrderStatus.COMPLETED and not self.real_duration:
-            raise ValueError("La duracion real es obligatoria al completar una orden")
-        return self
 
 
 class WorkOrderRead(ORMModel):
@@ -50,6 +49,8 @@ class WorkOrderRead(ORMModel):
     preventive_plan_id: UUID | None
     assigned_to: UUID | None
     created_by: UUID
+    validated_by: UUID | None
+    closed_by: UUID | None
     number: str
     title: str
     description: str
@@ -62,7 +63,96 @@ class WorkOrderRead(ORMModel):
     estimated_duration: int | None
     real_duration: int | None
     observations: str | None
+    work_performed: str | None
+    failure_cause: str | None
+    root_cause: str | None
+    resolution: str | None
+    validated_at: datetime | None
+    closed_at: datetime | None
+    version: int
     created_at: datetime
+    updated_at: datetime
     asset: AssetSummary
     assignee: UserSummary | None
     creator: UserSummary
+
+
+class WorkOrderParticipantCreate(BaseModel):
+    user_id: UUID
+    role: WorkOrderParticipantRole = WorkOrderParticipantRole.TECHNICIAN
+
+
+class WorkOrderParticipantRead(ORMModel):
+    id: UUID
+    user_id: UUID
+    assigned_by: UUID | None
+    role: WorkOrderParticipantRole
+    active: bool
+    joined_at: datetime
+    removed_at: datetime | None
+    user: UserSummary
+    assigner: UserSummary | None
+
+
+class WorkSessionRead(ORMModel):
+    id: UUID
+    user_id: UUID
+    started_at: datetime
+    ended_at: datetime | None
+    ended_reason: WorkSessionEndReason | None
+    duration_seconds: int | None
+    user: UserSummary
+
+
+class WorkOrderNoteCreate(BaseModel):
+    note_type: WorkOrderNoteType = WorkOrderNoteType.COMMENT
+    body: str = Field(min_length=2, max_length=4000)
+
+
+class WorkOrderNoteRead(ORMModel):
+    id: UUID
+    author_id: UUID | None
+    note_type: WorkOrderNoteType
+    body: str
+    created_at: datetime
+    author: UserSummary | None
+
+
+class WorkOrderEventRead(ORMModel):
+    id: UUID
+    actor_id: UUID | None
+    sequence_no: int
+    event_type: WorkOrderEventType
+    summary: str
+    details: dict
+    occurred_at: datetime
+    actor: UserSummary | None
+
+
+class WorkOrderDetailRead(WorkOrderRead):
+    validator: UserSummary | None
+    closer: UserSummary | None
+    participants: list[WorkOrderParticipantRead]
+    sessions: list[WorkSessionRead]
+    notes: list[WorkOrderNoteRead]
+    events: list[WorkOrderEventRead]
+
+
+class WorkSessionCommand(BaseModel):
+    note: str | None = Field(default=None, min_length=2, max_length=1000)
+
+
+class WorkOrderComplete(BaseModel):
+    work_performed: str = Field(min_length=10, max_length=8000)
+    failure_cause: str | None = Field(default=None, max_length=4000)
+    root_cause: str | None = Field(default=None, max_length=4000)
+    resolution: str | None = Field(default=None, max_length=8000)
+    observations: str | None = Field(default=None, max_length=4000)
+
+
+class WorkOrderValidation(BaseModel):
+    note: str | None = Field(default=None, min_length=2, max_length=2000)
+
+
+class WorkOrderReopen(BaseModel):
+    reason: str = Field(min_length=5, max_length=2000)

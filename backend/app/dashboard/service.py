@@ -106,7 +106,14 @@ def dashboard_data(
         .join(Asset, Asset.id == WorkOrder.asset_id)
         .where(
             *order_scope,
-            WorkOrder.status.notin_([WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED]),
+            WorkOrder.status.notin_(
+                [
+                    WorkOrderStatus.PENDING_VALIDATION,
+                    WorkOrderStatus.COMPLETED,
+                    WorkOrderStatus.CLOSED,
+                    WorkOrderStatus.CANCELLED,
+                ]
+            ),
         )
         .order_by(WorkOrder.scheduled_date.asc().nullslast(), WorkOrder.created_at.desc())
         .limit(5)
@@ -133,7 +140,10 @@ def dashboard_data(
         critical_incidents=priority_counts.get(Priority.CRITICAL, 0),
         pending_work_orders=pending_orders,
         in_progress_work_orders=order_counts.get(WorkOrderStatus.IN_PROGRESS, 0),
-        completed_work_orders=order_counts.get(WorkOrderStatus.COMPLETED, 0),
+        completed_work_orders=(
+            order_counts.get(WorkOrderStatus.COMPLETED, 0)
+            + order_counts.get(WorkOrderStatus.CLOSED, 0)
+        ),
         upcoming_preventive_count=upcoming_preventive_count or 0,
         low_stock_items=low_stock_items or 0,
         downtime_hours=round(float(downtime_minutes or 0) / 60, 1),

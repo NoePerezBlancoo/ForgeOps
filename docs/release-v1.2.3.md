@@ -13,6 +13,8 @@ ForgeOps 1.2.3 convierte el despliegue en un proceso verificable. La promocion d
 - Preflight de formato de version, tag y metadatos antes del environment protegido de produccion.
 - Timeouts explicitos para impedir ejecuciones de despliegue indefinidas.
 - Roadmap comercial y ADR de trazabilidad de intervenciones versionados.
+- Intervenciones multi-tecnico con sesiones, notas, historial inmutable y validacion responsable.
+- Centro de ordenes responsive con acciones operativas, equipo, tiempos y cierre controlado.
 
 ## Estado de validacion
 
@@ -21,9 +23,11 @@ ForgeOps 1.2.3 convierte el despliegue en un proceso verificable. La promocion d
 | PR #8 y orquestador local | `TESTED` | Fusion y Quality Gate verde en `main` |
 | Smoke validator | `TESTED` | Ruff y pruebas unitarias ejecutadas |
 | Workflows staging/production | `IMPLEMENTED` | Revision de sintaxis y Quality Gate del PR |
-| Staging V1.2.3 | Pendiente | Workflow `Deploy staging` y validador remoto verdes |
-| PostgreSQL HA/PgBouncer runtime | Pendiente de revalidacion | Resultado de `validate_staging.py` |
-| Storage/worker/RLS/MFA | Pendiente de revalidacion | Resultado de `validate_staging.py` |
+| Trazabilidad de intervenciones | `TESTED` | Suite API, migracion real, RLS, Redis y revision responsive |
+| Staging V1.2.2 | `STAGING_VALIDATED` | Release validator remoto con health, readiness y frontend |
+| Staging V1.2.3 | `EXTERNAL_BLOCKER` | `RAILWAY_STAGING_ENABLED=false` |
+| PostgreSQL/RLS y worker local | `TESTED` | PostgreSQL 17, rol runtime y roundtrip Redis ejecutados |
+| Storage y MFA | `TESTED` | Suite automatizada local |
 | Backups y PITR | `EXTERNAL_BLOCKER` | Captura/configuracion del proveedor y restore no productivo |
 | Produccion | `EXTERNAL_BLOCKER` | Aprobacion de cutover y environment configurado |
 
@@ -84,4 +88,3 @@ No se ejecuta `alembic downgrade` improvisado ni se restaura sobre la base de da
 - La configuracion real de backups/PITR y un ensayo de restore requieren acceso operativo al proyecto Railway.
 - Dominios, DNS, SMTP y Sentry requieren servicios o credenciales del propietario.
 - El cutover final de produccion requiere autorizacion expresa.
-
