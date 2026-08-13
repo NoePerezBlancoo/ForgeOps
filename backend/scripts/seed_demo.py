@@ -726,7 +726,13 @@ def get_or_create_documents(db, company, assets, users) -> None:
         if exists:
             continue
         encoded = content.encode("utf-8")
-        key = storage.store(company.id, filename, encoded)
+        stored = storage.store(
+            company.id,
+            assets[asset_index].id,
+            filename,
+            encoded,
+            "text/plain",
+        )
         db.add(
             TechnicalDocument(
                 company_id=company.id,
@@ -734,10 +740,10 @@ def get_or_create_documents(db, company, assets, users) -> None:
                 uploaded_by=users["manager"].id,
                 name=name,
                 type=document_type,
-                storage_key=key,
-                original_name=filename,
-                mime_type="text/plain; charset=utf-8",
-                file_size=len(encoded),
+                storage_key=stored.key,
+                original_name=stored.original_name,
+                mime_type=stored.mime_type,
+                file_size=stored.size,
                 description="Documento tecnico controlado para uso del equipo de mantenimiento.",
             )
         )
