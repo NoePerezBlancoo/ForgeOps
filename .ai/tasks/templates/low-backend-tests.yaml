@@ -1,0 +1,22 @@
+id: AI-0001
+title: Improve incident tests
+objective: Add focused tests for uncovered incident behavior without modifying production code.
+allowed_paths:
+  - backend/tests/
+forbidden_paths:
+  - backend/alembic/
+required_checks:
+  - backend-ruff
+  - pytest:tests/test_operations.py
+max_attempts: 3
+timeout_minutes: 45
+allow_commit: true
+allow_push: false
+allow_merge: false
+allow_network: false
+risk: LOW
+depends_on: []
+context_files:
+  - backend/app/incidents/
+  - backend/tests/conftest.py
+

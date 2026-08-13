@@ -1,0 +1,17 @@
+id: AI-0900
+title: Security-sensitive change placeholder
+objective: This template documents high-risk classification and must remain under direct Codex ownership.
+allowed_paths:
+  - backend/app/auth/
+required_checks:
+  - backend-ruff
+  - backend-pytest
+max_attempts: 1
+timeout_minutes: 60
+allow_commit: true
+allow_push: false
+allow_merge: false
+allow_network: false
+risk: HIGH
+depends_on: []
+

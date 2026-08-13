@@ -1,0 +1,19 @@
+FROM nikolaik/python-nodejs:python3.12-nodejs22-bookworm
+
+ARG OPENHANDS_VERSION=1.16.0
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git jq \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir "openhands==${OPENHANDS_VERSION}" \
+    && useradd --create-home --uid 10001 --shell /bin/bash agent \
+    && mkdir -p /workspace /task \
+    && chown -R agent:agent /workspace /task
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    NO_COLOR=1
+
+USER agent
+WORKDIR /workspace
+

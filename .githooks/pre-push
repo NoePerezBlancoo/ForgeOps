@@ -1,0 +1,24 @@
+#!/bin/sh
+while read local_ref local_sha remote_ref remote_sha; do
+  branch="${local_ref#refs/heads/}"
+  case "$branch" in
+    ai/*)
+      if [ "${FORGEOPS_AI_ALLOW_PUSH:-}" != "1" ]; then
+        echo "Automatic pushes from ai/* branches are disabled." >&2
+        exit 1
+      fi
+      ;;
+  esac
+  case "${remote_ref#refs/heads/}" in
+    production|release|release/*)
+      echo "Pushes to protected production/release refs are blocked." >&2
+      exit 1
+      ;;
+  esac
+  if [ "$remote_sha" != "0000000000000000000000000000000000000000" ] \
+    && ! git merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+    echo "Non-fast-forward pushes are blocked." >&2
+    exit 1
+  fi
+done
+

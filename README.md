@@ -79,6 +79,15 @@ docker compose config --quiet
 
 GitHub Actions repite estas comprobaciones con PostgreSQL y Redis reales, prueba ataques tenant/RLS, audita dependencias, busca secretos y construye las imagenes.
 
+## Local AI Development
+
+ForgeOps incluye un orquestador local para delegar tareas acotadas a OpenHands y modelos Ollama sin dar acceso a `main`, credenciales o infraestructura. Cada tarea utiliza una rama `ai/*`, un worktree independiente, un contenedor aislado, quality gates y revision final de Codex.
+
+- [Instalacion](docs/local-ai/installation.md)
+- [Operaciones](docs/local-ai/operations.md)
+- [Protocolo Codex](docs/local-ai/codex-orchestration.md)
+- [Resolucion de problemas](docs/local-ai/troubleshooting.md)
+
 ## Seguridad
 
 - Argon2, JWT corto y refresh rotatorio `HttpOnly`.

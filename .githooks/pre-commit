@@ -1,0 +1,11 @@
+#!/bin/sh
+branch="$(git branch --show-current)"
+case "$branch" in
+  ai/*)
+    if [ "${FORGEOPS_AGENT_VALIDATED:-}" != "1" ]; then
+      echo "AI branch commits must pass forgeops-agent validation." >&2
+      exit 1
+    fi
+    ;;
+esac
+

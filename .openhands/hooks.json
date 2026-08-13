@@ -1,0 +1,14 @@
+{
+  "pre_tool_use": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "command": "python .openhands/hooks/policy.py",
+          "timeout": 10
+        }
+      ]
+    }
+  ]
+}
+

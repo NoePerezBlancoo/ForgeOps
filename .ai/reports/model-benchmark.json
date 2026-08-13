@@ -1,0 +1,303 @@
+{
+  "generated_at": "2026-08-13T12:27:43.985280+00:00",
+  "context_tokens": 32768,
+  "primary": "qwen3-coder:30b",
+  "fallback": "devstral-small-2:24b",
+  "selection_method": "Fastest model within 0.05 quality points of the best controlled score",
+  "models": [
+    {
+      "model": "qwen3-coder:30b",
+      "quality_score": 0.833,
+      "average_tokens_per_second": 74.39,
+      "cases": [
+        {
+          "name": "module_comprehension",
+          "score": 0.667,
+          "duration_seconds": 12.6,
+          "tokens_per_second": 72.69,
+          "response_preview": "This function implements a trust boundary between direct client connections and proxied requests. When `source` is 'x-real-ip', it trusts the `X-Real-IP` header from reverse proxies, falling back to direct connection IP if the header is invalid or missing. The trust boundary assumes proxy servers are trusted but validates IP addresses for security.",
+          "resources_before": {
+            "cpu_percent": 10.5,
+            "memory_total_gb": 31.11,
+            "memory_available_gb": 18.49,
+            "disk_free_gb": 3009.37,
+            "gpu": {
+              "name": "NVIDIA GeForce RTX 5080",
+              "driver": "596.49",
+              "memory_total_mb": 16303,
+              "memory_used_mb": 1033,
+              "memory_free_mb": 14945,
+              "temperature_c": 44,
+              "utilization_percent": 3
+            }
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5080",
+            "driver": "596.49",
+            "memory_total_mb": 16303,
+            "memory_used_mb": 15171,
+            "memory_free_mb": 807,
+            "temperature_c": 50,
+            "utilization_percent": 28
+          }
+        },
+        {
+          "name": "test_generation",
+          "score": 0.5,
+          "duration_seconds": 2.71,
+          "tokens_per_second": 74.74,
+          "response_preview": "```python\ndef test_get_client_ip_rejects_comma_spoofed_x_real_ip():\n    \"\"\"Test that get_client_ip rejects comma-separated spoofed X-Real-IP and returns direct peer\"\"\"\n    # Mock request with spoofed X-Real-IP header containing comma\n    mock_request = Mock()\n    mock_request.headers = {'X-Real-IP': '192.168.1.100, 10.0.0.1'}\n    mock_request.peer = '172.16.0.1'\n    \n    # Mock the function to return the direct peer instead of parsed header\n    with patch('your_module.get_client_ip', return_valu",
+          "resources_before": {
+            "cpu_percent": 36.3,
+            "memory_total_gb": 31.11,
+            "memory_available_gb": 10.9,
+            "disk_free_gb": 3009.37,
+            "gpu": {
+              "name": "NVIDIA GeForce RTX 5080",
+              "driver": "596.49",
+              "memory_total_mb": 16303,
+              "memory_used_mb": 15171,
+              "memory_free_mb": 807,
+              "temperature_c": 50,
+              "utilization_percent": 28
+            }
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5080",
+            "driver": "596.49",
+            "memory_total_mb": 16303,
+            "memory_used_mb": 15171,
+            "memory_free_mb": 807,
+            "temperature_c": 50,
+            "utilization_percent": 27
+          }
+        },
+        {
+          "name": "controlled_bug_fix",
+          "score": 1.0,
+          "duration_seconds": 0.79,
+          "tokens_per_second": 73.91,
+          "response_preview": "def total(values):\n    if not values:\n        return 0\n    result = 0\n    for index in range(0, len(values)):\n        result += values[index]\n    return result",
+          "resources_before": {
+            "cpu_percent": 34.1,
+            "memory_total_gb": 31.11,
+            "memory_available_gb": 10.89,
+            "disk_free_gb": 3009.37,
+            "gpu": {
+              "name": "NVIDIA GeForce RTX 5080",
+              "driver": "596.49",
+              "memory_total_mb": 16303,
+              "memory_used_mb": 15171,
+              "memory_free_mb": 807,
+              "temperature_c": 50,
+              "utilization_percent": 27
+            }
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5080",
+            "driver": "596.49",
+            "memory_total_mb": 16303,
+            "memory_used_mb": 15174,
+            "memory_free_mb": 804,
+            "temperature_c": 50,
+            "utilization_percent": 27
+          }
+        },
+        {
+          "name": "instruction_following",
+          "score": 1.0,
+          "duration_seconds": 0.27,
+          "tokens_per_second": 76.22,
+          "response_preview": "FORGEOPS_POLICY_OK",
+          "resources_before": {
+            "cpu_percent": 37.0,
+            "memory_total_gb": 31.11,
+            "memory_available_gb": 10.87,
+            "disk_free_gb": 3009.37,
+            "gpu": {
+              "name": "NVIDIA GeForce RTX 5080",
+              "driver": "596.49",
+              "memory_total_mb": 16303,
+              "memory_used_mb": 15174,
+              "memory_free_mb": 804,
+              "temperature_c": 50,
+              "utilization_percent": 27
+            }
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5080",
+            "driver": "596.49",
+            "memory_total_mb": 16303,
+            "memory_used_mb": 15174,
+            "memory_free_mb": 804,
+            "temperature_c": 48,
+            "utilization_percent": 2
+          }
+        },
+        {
+          "name": "tool_calling",
+          "score": 1.0,
+          "duration_seconds": 0.62,
+          "tokens_per_second": null,
+          "response_preview": "[{\"id\": \"call_vcj417dx\", \"function\": {\"index\": 0, \"name\": \"read_file\", \"arguments\": {\"path\": \"backend/app/core/request.py\"}}}]",
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5080",
+            "driver": "596.49",
+            "memory_total_mb": 16303,
+            "memory_used_mb": 15174,
+            "memory_free_mb": 804,
+            "temperature_c": 52,
+            "utilization_percent": 73
+          }
+        }
+      ]
+    },
+    {
+      "model": "devstral-small-2:24b",
+      "quality_score": 0.85,
+      "average_tokens_per_second": 10.31,
+      "cases": [
+        {
+          "name": "module_comprehension",
+          "score": 1.0,
+          "duration_seconds": 19.9,
+          "tokens_per_second": 10.34,
+          "response_preview": "**Trust Boundary**: The function trusts the `X-Real-IP` header only when explicitly requested via `source='x-real-ip'`. Otherwise, it relies on the direct client IP from `request.client.host`.\n\n**Fallback Behavior**: If parsing the `X-Real-IP` header fails (e.g., invalid IP), it falls back to the direct client IP. This ensures a safe default when forwarded headers are unreliable or malicious.\n\n(Word count: 60)",
+          "resources_before": {
+            "cpu_percent": 12.0,
+            "memory_total_gb": 31.11,
+            "memory_available_gb": 10.87,
+            "disk_free_gb": 3009.37,
+            "gpu": {
+              "name": "NVIDIA GeForce RTX 5080",
+              "driver": "596.49",
+              "memory_total_mb": 16303,
+              "memory_used_mb": 1026,
+              "memory_free_mb": 14952,
+              "temperature_c": 49,
+              "utilization_percent": 10
+            }
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5080",
+            "driver": "596.49",
+            "memory_total_mb": 16303,
+            "memory_used_mb": 15086,
+            "memory_free_mb": 892,
+            "temperature_c": 48,
+            "utilization_percent": 23
+          }
+        },
+        {
+          "name": "test_generation",
+          "score": 1.0,
+          "duration_seconds": 11.0,
+          "tokens_per_second": 10.25,
+          "response_preview": "```python\nimport pytest\n\ndef test_get_client_ip_rejects_spoofed_x_real_ip():\n    from your_module import get_client_ip  # Replace 'your_module' with actual module name\n    headers = {\"X-Real-IP\": \"192.168.1.1, 10.0.0.1\"}\n    peer_ip = \"203.0.113.45\"\n    assert get_client_ip(headers, peer_ip) == peer_ip\n```",
+          "resources_before": {
+            "cpu_percent": 30.6,
+            "memory_total_gb": 31.11,
+            "memory_available_gb": 12.01,
+            "disk_free_gb": 3009.37,
+            "gpu": {
+              "name": "NVIDIA GeForce RTX 5080",
+              "driver": "596.49",
+              "memory_total_mb": 16303,
+              "memory_used_mb": 15086,
+              "memory_free_mb": 892,
+              "temperature_c": 48,
+              "utilization_percent": 23
+            }
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5080",
+            "driver": "596.49",
+            "memory_total_mb": 16303,
+            "memory_used_mb": 15086,
+            "memory_free_mb": 892,
+            "temperature_c": 49,
+            "utilization_percent": 20
+          }
+        },
+        {
+          "name": "controlled_bug_fix",
+          "score": 0.25,
+          "duration_seconds": 11.37,
+          "tokens_per_second": 10.18,
+          "response_preview": "Here's the corrected function that handles empty input by returning 0 and includes the last element in the sum:\n\n```python\ndef total(values):\n    if not values:\n        return 0\n    result = 0\n    for index in range(len(values)):\n        result += values[index]\n    return result\n```\n\nThe changes made are:\n1. Added a check for empty input at the beginning (returns 0)\n2. Changed `range(0, len(values) - 1)` to `range(len(values))` to include the last element",
+          "resources_before": {
+            "cpu_percent": 39.1,
+            "memory_total_gb": 31.11,
+            "memory_available_gb": 12.0,
+            "disk_free_gb": 3009.37,
+            "gpu": {
+              "name": "NVIDIA GeForce RTX 5080",
+              "driver": "596.49",
+              "memory_total_mb": 16303,
+              "memory_used_mb": 15086,
+              "memory_free_mb": 892,
+              "temperature_c": 49,
+              "utilization_percent": 14
+            }
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5080",
+            "driver": "596.49",
+            "memory_total_mb": 16303,
+            "memory_used_mb": 15086,
+            "memory_free_mb": 892,
+            "temperature_c": 50,
+            "utilization_percent": 27
+          }
+        },
+        {
+          "name": "instruction_following",
+          "score": 1.0,
+          "duration_seconds": 1.5,
+          "tokens_per_second": 10.48,
+          "response_preview": "FORGEOPS_POLICY_OK",
+          "resources_before": {
+            "cpu_percent": 32.2,
+            "memory_total_gb": 31.11,
+            "memory_available_gb": 12.01,
+            "disk_free_gb": 3009.37,
+            "gpu": {
+              "name": "NVIDIA GeForce RTX 5080",
+              "driver": "596.49",
+              "memory_total_mb": 16303,
+              "memory_used_mb": 15086,
+              "memory_free_mb": 892,
+              "temperature_c": 50,
+              "utilization_percent": 27
+            }
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5080",
+            "driver": "596.49",
+            "memory_total_mb": 16303,
+            "memory_used_mb": 15086,
+            "memory_free_mb": 892,
+            "temperature_c": 52,
+            "utilization_percent": 26
+          }
+        },
+        {
+          "name": "tool_calling",
+          "score": 1.0,
+          "duration_seconds": 1.55,
+          "tokens_per_second": null,
+          "response_preview": "[{\"id\": \"call_ogrhuh3m\", \"function\": {\"index\": 0, \"name\": \"read_file\", \"arguments\": {\"path\": \"backend/app/core/request.py\"}}}]",
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5080",
+            "driver": "596.49",
+            "memory_total_mb": 16303,
+            "memory_used_mb": 15086,
+            "memory_free_mb": 892,
+            "temperature_c": 50,
+            "utilization_percent": 14
+          }
+        }
+      ]
+    }
+  ]
+}

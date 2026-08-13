@@ -1,0 +1,20 @@
+id: AI-0002
+title: Improve work order responsive behavior
+objective: Improve the work-order view at mobile and tablet breakpoints without changing business behavior.
+allowed_paths:
+  - frontend/app/work-orders/
+  - frontend/components/
+  - frontend/app/globals.css
+required_checks:
+  - frontend-quality
+max_attempts: 3
+timeout_minutes: 90
+allow_commit: true
+allow_push: false
+allow_merge: false
+allow_network: false
+risk: LOW
+depends_on: []
+context_files:
+  - frontend/app/work-orders/
+

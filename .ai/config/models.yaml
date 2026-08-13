@@ -1,0 +1,21 @@
+version: 1
+
+ollama:
+  host_url: http://127.0.0.1:11434
+  context_tokens: 32768
+  keep_alive: 10m
+
+selection:
+  primary: qwen3-coder:30b
+  fallback: devstral-small-2:24b
+
+candidates:
+  - name: qwen3-coder:30b
+    size_gb: 19
+    native_context: 262144
+    role: agentic coding
+  - name: devstral-small-2:24b
+    size_gb: 15
+    native_context: 393216
+    role: repository exploration and tool use
+

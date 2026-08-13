@@ -1,0 +1,16 @@
+id: AI-0003
+title: Improve form accessibility
+objective: Improve labels, focus behavior and semantic feedback in one explicitly selected frontend form.
+allowed_paths:
+  - frontend/components/
+required_checks:
+  - frontend-quality
+max_attempts: 2
+timeout_minutes: 60
+allow_commit: true
+allow_push: false
+allow_merge: false
+allow_network: false
+risk: LOW
+depends_on: []
+
