@@ -19,6 +19,8 @@ const tones: Record<string, string> = {
   LOW: "badge-neutral",
   CANCELLED: "badge-neutral",
   PENDING: "badge-warning",
+  SYNCING: "badge-info",
+  CONFLICT: "badge-danger",
   INDEXING: "badge-info",
   READY: "badge-success",
   FAILED: "badge-danger",

@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   PackageSearch,
+  RefreshCcw,
   ShieldCheck,
   ShieldAlert,
   SlidersHorizontal,
@@ -37,6 +38,7 @@ const primaryNavigation = [
   { href: "/work-orders", label: "Ordenes de trabajo", icon: ClipboardList },
   { href: "/incidents", label: "Incidencias", icon: ShieldAlert },
   { href: "/assets", label: "Activos", icon: Boxes },
+  { href: "/sync", label: "Sincronizacion", icon: RefreshCcw },
 ];
 
 const planningNavigation = [
@@ -72,6 +74,7 @@ const pageNames: Record<string, string> = {
   "/getting-started": "Primeros pasos",
   "/settings": "Seguridad y auditoria",
   "/notifications": "Notificaciones",
+  "/sync": "Sincronizacion local",
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -124,7 +127,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 title={item.label}
               >
                 <Icon size={19} />
-                <span className="md:hidden lg:inline">{item.label}</span>
+                <span className="md:hidden lg:inline">
+                  {item.href === "/work-orders" && user?.role === "TECHNICIAN" ? "Mi trabajo" : item.label}
+                </span>
               </Link>
             );
           })}

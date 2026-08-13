@@ -4,6 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createContext, useContext } from "react";
 
 import { ApiError, apiDownload, apiRequest } from "@/lib/api";
+import {
+  clearOfflineIdentity,
+  loadOfflineIdentity,
+  saveOfflineIdentity,
+} from "@/lib/offline-identity";
+import { clearOfflineData, isNetworkUnavailable } from "@/lib/offline-queue";
 import type { TrialRegistration, User } from "@/lib/types";
 
 interface SessionResponse {
@@ -40,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .then((session) => {
           tokenRef.current = session.access_token;
           setUser(session.user);
+          saveOfflineIdentity(session.user);
           return session.access_token;
         })
         .finally(() => {
@@ -51,9 +58,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     renew()
-      .catch(() => {
+      .catch((error) => {
         tokenRef.current = null;
-        setUser(null);
+        const cachedUser = isNetworkUnavailable(error) ? loadOfflineIdentity() : null;
+        if (!cachedUser) clearOfflineIdentity();
+        setUser(cachedUser);
       })
       .finally(() => setLoading(false));
   }, [renew]);
@@ -65,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     tokenRef.current = session.access_token;
     setUser(session.user);
+    saveOfflineIdentity(session.user);
   }, []);
 
   const registerTrial = useCallback(async (payload: TrialRegistration) => {
@@ -74,16 +84,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     tokenRef.current = session.access_token;
     setUser(session.user);
+    saveOfflineIdentity(session.user);
   }, []);
 
   const logout = useCallback(async () => {
+    const owner = user ? { companyId: user.company_id, userId: user.id } : undefined;
     try {
       await apiRequest("/auth/logout", { method: "POST", body: JSON.stringify({}) });
     } finally {
       tokenRef.current = null;
       setUser(null);
+      clearOfflineIdentity();
+      await clearOfflineData(owner).catch(() => undefined);
     }
-  }, []);
+  }, [user]);
 
   const request = useCallback(
     async <T,>(path: string, options: RequestInit = {}): Promise<T> => {

@@ -4,6 +4,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/components/auth-provider";
+import {
+  isNetworkUnavailable,
+  loadOfflineSnapshot,
+  saveOfflineSnapshot,
+  type OfflineOwner,
+} from "@/lib/offline-queue";
 import type { Company, CompanyModule, Onboarding, Plant } from "@/lib/types";
 
 interface WorkspaceContextValue {
@@ -35,11 +41,22 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [selectedPlantId, setSelectedPlantIdState] = useState("");
 
   const storageKey = user ? `forgeops.plant.${user.company_id}` : "forgeops.plant";
+  const owner = useMemo<OfflineOwner | null>(
+    () => user ? { companyId: user.company_id, userId: user.id } : null,
+    [user],
+  );
 
   const reloadPlants = useCallback(async () => {
     setPlantsLoading(true);
     try {
-      const loadedPlants = await request<Plant[]>("/plants");
+      let loadedPlants: Plant[];
+      try {
+        loadedPlants = await request<Plant[]>("/plants");
+        if (owner) await saveOfflineSnapshot(owner, "workspace:plants", loadedPlants);
+      } catch (error) {
+        if (!owner || !isNetworkUnavailable(error)) throw error;
+        loadedPlants = await loadOfflineSnapshot<Plant[]>(owner, "workspace:plants") ?? [];
+      }
       setPlants(loadedPlants);
       const saved = window.localStorage.getItem(storageKey) ?? "";
       setSelectedPlantIdState(
@@ -48,12 +65,21 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setPlantsLoading(false);
     }
-  }, [request, storageKey]);
+  }, [owner, request, storageKey]);
 
   const reloadCompany = useCallback(async () => {
-    const loadedCompany = await request<Company>("/companies/current");
+    let loadedCompany: Company;
+    try {
+      loadedCompany = await request<Company>("/companies/current");
+      if (owner) await saveOfflineSnapshot(owner, "workspace:company", loadedCompany);
+    } catch (error) {
+      if (!owner || !isNetworkUnavailable(error)) throw error;
+      const cached = await loadOfflineSnapshot<Company>(owner, "workspace:company");
+      if (!cached) return;
+      loadedCompany = cached;
+    }
     setCompany(loadedCompany);
-  }, [request]);
+  }, [owner, request]);
 
   const reloadOnboarding = useCallback(async () => {
     const loadedOnboarding = await request<Onboarding>("/onboarding");
@@ -61,7 +87,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, [request]);
 
   useEffect(() => {
-    void reloadPlants();
+    void reloadPlants().catch(() => undefined);
   }, [reloadPlants]);
 
   useEffect(() => {

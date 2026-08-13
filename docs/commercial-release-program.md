@@ -27,7 +27,7 @@ Fecha de auditoria: 2026-08-13.
 | Usuarios, invitaciones y notificaciones | `TESTED` | Invitacion de un solo uso, plazas, RLS, correo durable, avisos de dominio y UI responsive |
 | Mantenimiento preventivo | `TESTED` | Checklists historicos, generacion atomica, scheduler, RLS y ejecucion responsive |
 | Inventario integrado con OT | `TESTED` | Stock transaccional, costes historicos, devoluciones compensatorias, RLS y UI responsive |
-| PWA basica | `IMPLEMENTED` | Manifest, service worker, shell offline y cola local |
+| PWA de tecnico | `TESTED` | Sesion temporal, snapshots tenant-scoped, cola idempotente, conflictos visibles y sync automatico |
 | Railway staging V1.2.2 | `STAGING_VALIDATED` | Health, readiness, Redis, frontend y validador remoto comprobados |
 | Railway staging automatico | `EXTERNAL_BLOCKER` | Variable GitHub `RAILWAY_STAGING_ENABLED=false` |
 | Dominios finales | `EXTERNAL_BLOCKER` | Requiere dominio y cambios DNS del propietario |
@@ -46,6 +46,7 @@ Fecha de auditoria: 2026-08-13.
 | D | Users and Notifications | Invitaciones seguras, activacion, plazas, correo y avisos in-app | `TESTED` |
 | E | Preventive Maintenance | Planes recurrentes, checklists trazables y generacion automatizable de OT | `TESTED` |
 | F | Inventory Integration | Consumos y devoluciones por OT, stock concurrente, costes y alertas | `TESTED` |
+| G | Technician PWA | Lectura offline, incidencias y notas idempotentes, sincronizacion y UX movil | `TESTED` |
 | M | Production Release | Cutover autorizado, observacion y validacion productiva | `EXTERNAL_BLOCKER` |
 
 La secuencia restante conserva este orden de dependencias: Technician PWA, Reporting, Product UX, Commercial Readiness, Assurance y Release Candidate. Cada fase recibira uno de los estados permitidos cuando exista implementacion o evidencia; no se asigna un estado anticipado.
@@ -104,6 +105,17 @@ Estado: `TESTED`. Validado con 61 pruebas backend, 4 pruebas PostgreSQL/RLS, 84 
 - `FO-0505`: alertas de minimo, aislamiento RLS, pruebas y QA responsive.
 
 Estado: `TESTED`. Validado con 66 pruebas backend, 5 pruebas PostgreSQL/RLS, 84,28 % de cobertura, migraciones reversibles, build de produccion y recorrido real de consumo/devolucion en 390 y 1280 px.
+
+### Phase G - Technician PWA
+
+- `AI-0601`: motor de sincronizacion delegado; Qwen y fallback Devstral fallaron typecheck y contrato, corregido bajo control de Codex.
+- `FO-0602`: identidad offline temporal y almacenamiento separado por empresa/usuario.
+- `FO-0603`: snapshots de plantas, activos, incidencias y ordenes previamente consultadas.
+- `FO-0604`: incidencias y notas con idempotencia persistente en PostgreSQL.
+- `FO-0605`: cola cronologica, sync automatico, conflictos visibles y bandeja de gestion.
+- `FO-0606`: service worker sin cache de API/control, UX tactil y acciones concurrentes online-only.
+
+Estado: `TESTED`. Validado con suite backend completa, pruebas unitarias del motor, migracion PostgreSQL, lint, typecheck, build de produccion y QA responsive/offline.
 
 ## Gates de promocion
 

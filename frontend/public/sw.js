@@ -1,4 +1,4 @@
-const CACHE_NAME = "forgeops-shell-v1.2.3";
+const CACHE_NAME = "forgeops-shell-v1.3.0";
 const APP_SHELL = [
   "/offline",
   "/manifest.webmanifest",
@@ -34,21 +34,34 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    event.respondWith(fetch(request).catch(() => caches.match("/offline")));
+    event.respondWith(
+      (async () => {
+        try {
+          const response = await fetch(request);
+          if (response.ok) {
+            const copy = response.clone();
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, copy);
+          }
+          return response;
+        } catch {
+          return (await caches.match(request)) || (await caches.match("/offline")) || Response.error();
+        }
+      })(),
+    );
     return;
   }
 
   if (url.pathname.startsWith("/_next/static/") || url.pathname.endsWith(".svg")) {
     event.respondWith(
-      caches.match(request).then(
-        (cached) =>
-          cached ||
-          fetch(request).then((response) => {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-            return response;
-          }),
-      ),
+      (async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        const response = await fetch(request);
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(request, response.clone());
+        return response;
+      })(),
     );
   }
 });

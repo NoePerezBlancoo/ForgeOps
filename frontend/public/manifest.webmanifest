@@ -32,7 +32,7 @@
   ],
   "shortcuts": [
     { "name": "Incidencias", "short_name": "Incidencias", "url": "/incidents" },
-    { "name": "Ordenes de trabajo", "short_name": "Ordenes", "url": "/work-orders" },
+    { "name": "Mi trabajo", "short_name": "Mi trabajo", "url": "/work-orders" },
     { "name": "Activos", "short_name": "Activos", "url": "/assets" }
   ]
 }

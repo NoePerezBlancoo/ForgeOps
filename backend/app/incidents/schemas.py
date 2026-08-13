@@ -8,6 +8,7 @@ from app.core.schemas import AssetSummary, ORMModel, UserSummary
 
 
 class IncidentCreate(BaseModel):
+    client_request_id: UUID | None = None
     plant_id: UUID
     asset_id: UUID
     assigned_to: UUID | None = None
@@ -42,6 +43,7 @@ class IncidentRead(ORMModel):
     asset_id: UUID
     reported_by: UUID
     assigned_to: UUID | None
+    client_request_id: UUID | None
     title: str
     description: str
     priority: Priority

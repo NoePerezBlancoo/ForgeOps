@@ -1,7 +1,17 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import (
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -15,6 +25,12 @@ class Incident(UUIDPrimaryKeyMixin, TenantMixin, Base):
         Index("ix_incidents_company_status", "company_id", "status"),
         Index("ix_incidents_company_priority", "company_id", "priority"),
         Index("ix_incidents_company_reported", "company_id", "reported_at"),
+        UniqueConstraint(
+            "company_id",
+            "reported_by",
+            "client_request_id",
+            name="uq_incident_client_request",
+        ),
     )
 
     plant_id: Mapped[uuid.UUID] = mapped_column(
@@ -29,6 +45,7 @@ class Incident(UUIDPrimaryKeyMixin, TenantMixin, Base):
     assigned_to: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
+    client_request_id: Mapped[uuid.UUID | None] = mapped_column()
     title: Mapped[str] = mapped_column(String(180), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     priority: Mapped[Priority] = mapped_column(

@@ -1,7 +1,7 @@
 "use client";
 
 import { Clock3, Plus, Search, Settings2 } from "lucide-react";
-import { FormEvent, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorBanner, LoadingBlock } from "@/components/feedback";
@@ -12,6 +12,13 @@ import { StatusBadge } from "@/components/status-badge";
 import { useWorkspace } from "@/components/workspace-provider";
 import { ApiError } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import {
+  isNetworkUnavailable,
+  loadOfflineSnapshot,
+  queueOfflineOperation,
+  saveOfflineSnapshot,
+  type OfflineOwner,
+} from "@/lib/offline-queue";
 import type { Asset, Incident, IncidentStatus, Paginated, Priority, UserOption } from "@/lib/types";
 
 const PAGE_SIZE = 25;
@@ -44,6 +51,7 @@ export default function IncidentsPage() {
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -55,6 +63,10 @@ export default function IncidentsPage() {
   const [saving, setSaving] = useState(false);
   const deepLinkHandled = useRef(false);
   const deferredSearch = useDeferredValue(search);
+  const owner = useMemo<OfflineOwner | null>(
+    () => user ? { companyId: user.company_id, userId: user.id } : null,
+    [user],
+  );
 
   const canManage = user && user.role !== "VIEWER";
 
@@ -68,27 +80,49 @@ export default function IncidentsPage() {
     });
     if (deferredSearch.trim()) params.set("search", deferredSearch.trim());
     if (statusFilter) params.set("status", statusFilter);
+    const path = scopedPath(`/incidents/page?${params}`);
     try {
-      setPageData(await request<Paginated<Incident>>(scopedPath(`/incidents/page?${params}`)));
+      const loaded = await request<Paginated<Incident>>(path);
+      setPageData(loaded);
+      if (owner) await saveOfflineSnapshot(owner, `incidents:${path}`, loaded);
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : "No se pudieron cargar las incidencias");
+      const cached = owner && isNetworkUnavailable(requestError)
+        ? await loadOfflineSnapshot<Paginated<Incident>>(owner, `incidents:${path}`)
+        : null;
+      if (cached) setPageData(cached);
+      else setError(requestError instanceof ApiError ? requestError.message : "No se pudieron cargar las incidencias");
     } finally {
       setLoading(false);
     }
-  }, [deferredSearch, page, request, scopedPath, statusFilter]);
+  }, [deferredSearch, owner, page, request, scopedPath, statusFilter]);
 
   const loadOptions = useCallback(async () => {
+    if (!owner) return;
+    const assetsPath = scopedPath("/assets");
     try {
       const [assetData, userData] = await Promise.all([
-        request<Asset[]>(scopedPath("/assets")),
+        request<Asset[]>(assetsPath),
         request<UserOption[]>("/users/options"),
       ]);
       setAssets(assetData);
       setUsers(userData.filter((item) => ["TECHNICIAN", "MAINTENANCE_MANAGER", "ADMIN"].includes(item.role)));
+      await Promise.all([
+        saveOfflineSnapshot(owner, `assets:${assetsPath}`, assetData),
+        saveOfflineSnapshot(owner, "users:options", userData),
+      ]);
     } catch (requestError) {
+      if (isNetworkUnavailable(requestError)) {
+        const [cachedAssets, cachedUsers] = await Promise.all([
+          loadOfflineSnapshot<Asset[]>(owner, `assets:${assetsPath}`),
+          loadOfflineSnapshot<UserOption[]>(owner, "users:options"),
+        ]);
+        setAssets(cachedAssets ?? []);
+        setUsers((cachedUsers ?? []).filter((item) => ["TECHNICIAN", "MAINTENANCE_MANAGER", "ADMIN"].includes(item.role)));
+        return;
+      }
       setError(requestError instanceof ApiError ? requestError.message : "No se pudieron cargar las opciones de asignacion");
     }
-  }, [request, scopedPath]);
+  }, [owner, request, scopedPath]);
 
   useEffect(() => { void loadIncidents(); }, [loadIncidents]);
   useEffect(() => { void loadOptions(); }, [loadOptions]);
@@ -147,23 +181,39 @@ export default function IncidentsPage() {
   async function createIncident(event: FormEvent) {
     event.preventDefault();
     const asset = assets.find((item) => item.id === createForm.asset_id);
-    if (!asset) return;
+    if (!asset || !owner) return;
     setSaving(true);
     setError("");
+    setNotice("");
+    const clientRequestId = crypto.randomUUID();
+    const payload = {
+      ...createForm,
+      plant_id: asset.plant_id,
+      assigned_to: createForm.assigned_to || null,
+      downtime_minutes: Number(createForm.downtime_minutes || 0),
+      client_request_id: clientRequestId,
+    };
     try {
-      await request("/incidents", {
-        method: "POST",
-        body: JSON.stringify({
-          ...createForm,
-          plant_id: asset.plant_id,
-          assigned_to: createForm.assigned_to || null,
-          downtime_minutes: Number(createForm.downtime_minutes || 0),
-        }),
-      });
+      if (!navigator.onLine) throw new TypeError("offline");
+      await request("/incidents", { method: "POST", body: JSON.stringify(payload) });
       setCreateOpen(false);
+      setNotice("Incidencia registrada correctamente.");
       await loadIncidents();
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : "No se pudo registrar la incidencia");
+      if (isNetworkUnavailable(requestError)) {
+        await queueOfflineOperation({
+          ...owner,
+          id: clientRequestId,
+          type: "INCIDENT_CREATE",
+          path: "/incidents",
+          payload,
+        });
+        setCreateOpen(false);
+        setCreateForm(emptyCreate);
+        setNotice("Incidencia guardada en este dispositivo. Se enviara al recuperar la conexion.");
+      } else {
+        setError(requestError instanceof ApiError ? requestError.message : "No se pudo registrar la incidencia");
+      }
     } finally {
       setSaving(false);
     }
@@ -201,6 +251,7 @@ export default function IncidentsPage() {
         description="Registro, asignacion y resolucion trazable de averias y desviaciones de planta."
         actions={canManage ? <button className="button-primary" onClick={openCreate}><Plus size={17} /> Nueva incidencia</button> : undefined}
       />
+      {notice && <div className="notice-success" role="status">{notice}</div>}
       {error && <ErrorBanner message={error} />}
       <section className="panel mb-4 flex flex-col gap-3 p-3 sm:flex-row">
         <label className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={17} /><input className="field field-with-icon" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar por incidencia, activo o codigo" /></label>

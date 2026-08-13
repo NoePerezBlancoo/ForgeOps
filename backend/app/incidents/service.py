@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.assets.models import Asset
@@ -124,6 +125,16 @@ def get_incident(db: Session, company_id: uuid.UUID, incident_id: uuid.UUID) -> 
 def create_incident(
     db: Session, company_id: uuid.UUID, reporter_id: uuid.UUID, payload: IncidentCreate
 ) -> Incident:
+    if payload.client_request_id:
+        existing = db.scalar(
+            _base_query().where(
+                Incident.company_id == company_id,
+                Incident.reported_by == reporter_id,
+                Incident.client_request_id == payload.client_request_id,
+            )
+        )
+        if existing:
+            return existing
     asset = _asset_for_company(db, company_id, payload.asset_id)
     if asset.plant_id != payload.plant_id:
         raise HTTPException(status_code=422, detail="El activo no pertenece a la planta indicada")
@@ -163,7 +174,24 @@ def create_incident(
                 href=f"/incidents?incident={incident.id}",
                 dedupe_key=f"critical-incident:{incident.id}",
             )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        existing = (
+            db.scalar(
+                _base_query().where(
+                    Incident.company_id == company_id,
+                    Incident.reported_by == reporter_id,
+                    Incident.client_request_id == payload.client_request_id,
+                )
+            )
+            if payload.client_request_id
+            else None
+        )
+        if existing:
+            return existing
+        raise HTTPException(status_code=409, detail="La incidencia ya existe") from exc
     return get_incident(db, company_id, incident.id)
 
 

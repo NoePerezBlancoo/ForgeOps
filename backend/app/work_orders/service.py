@@ -577,6 +577,17 @@ def add_note(
     order = _lock_order(db, current_user, order_id)
     if current_user.role == UserRole.TECHNICIAN:
         _active_participant(db, order, current_user)
+    if payload.client_request_id:
+        existing = db.scalar(
+            select(WorkOrderNote.id).where(
+                WorkOrderNote.company_id == order.company_id,
+                WorkOrderNote.work_order_id == order.id,
+                WorkOrderNote.author_id == current_user.id,
+                WorkOrderNote.client_request_id == payload.client_request_id,
+            )
+        )
+        if existing:
+            return get_work_order_detail(db, current_user, order.id)
     _add_note(db, order, current_user, payload)
     db.commit()
     return get_work_order_detail(db, current_user, order.id)
@@ -1146,6 +1157,7 @@ def _add_note(
         company_id=order.company_id,
         work_order_id=order.id,
         author_id=current_user.id,
+        client_request_id=payload.client_request_id,
         note_type=payload.note_type,
         body=payload.body.strip(),
     )
