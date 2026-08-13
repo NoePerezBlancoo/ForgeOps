@@ -19,7 +19,7 @@ La version **1.2.3 Production Deployment Foundation** convierte el piloto funcio
 - Planes Demo, Trial, Starter, Pro, Industrial y Enterprise.
 - Limites de usuarios, plantas, activos y almacenamiento.
 - Backoffice `/control` con identidad independiente, MFA y auditoria.
-- PWA instalable y cola local restringida para borradores compatibles.
+- PWA de tecnico con lectura offline, incidencias/notas idempotentes y conflictos visibles.
 
 ## Arquitectura
 

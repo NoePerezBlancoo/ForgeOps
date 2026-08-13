@@ -25,7 +25,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { FormEvent, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, ErrorBanner, LoadingBlock } from "@/components/feedback";
@@ -36,6 +36,14 @@ import { StatusBadge } from "@/components/status-badge";
 import { useWorkspace } from "@/components/workspace-provider";
 import { ApiError } from "@/lib/api";
 import { formatDate, initials, labelFor } from "@/lib/format";
+import {
+  isNetworkUnavailable,
+  loadOfflineSnapshot,
+  queueOfflineOperation,
+  saveOfflineSnapshot,
+  type OfflineOwner,
+} from "@/lib/offline-queue";
+import { useOnlineStatus } from "@/lib/use-online-status";
 import type {
   Asset,
   InventoryItem,
@@ -86,6 +94,7 @@ export default function WorkOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -105,6 +114,11 @@ export default function WorkOrdersPage() {
   const deepLinkHandled = useRef(false);
   const optionsSequence = useRef(0);
   const deferredSearch = useDeferredValue(search);
+  const online = useOnlineStatus();
+  const owner = useMemo<OfflineOwner | null>(
+    () => user ? { companyId: user.company_id, userId: user.id } : null,
+    [user],
+  );
 
   const isManager = Boolean(user && ["SUPER_ADMIN", "ADMIN", "MAINTENANCE_MANAGER"].includes(user.role));
   const canAct = user?.role !== "VIEWER";
@@ -116,9 +130,11 @@ export default function WorkOrdersPage() {
     const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE), sort: "created" });
     if (deferredSearch.trim()) params.set("search", deferredSearch.trim());
     if (statusFilter) params.set("status", statusFilter);
+    const path = scopedPath(`/work-orders/page?${params}`);
     try {
-      const loaded = await request<Paginated<WorkOrder>>(scopedPath(`/work-orders/page?${params}`));
+      const loaded = await request<Paginated<WorkOrder>>(path);
       setPageData(loaded);
+      if (owner) await saveOfflineSnapshot(owner, `work-orders:${path}`, loaded);
       const requestedOrder = !deepLinkHandled.current
         ? new URLSearchParams(window.location.search).get("order")
         : null;
@@ -134,17 +150,27 @@ export default function WorkOrdersPage() {
           : (loaded.items[0]?.id ?? null),
       );
     } catch (requestError) {
-      setError(messageFor(requestError, "No se pudieron cargar las ordenes"));
+      const cached = owner && isNetworkUnavailable(requestError)
+        ? await loadOfflineSnapshot<Paginated<WorkOrder>>(owner, `work-orders:${path}`)
+        : null;
+      if (cached) {
+        setPageData(cached);
+        setSelectedId((current) => current ?? cached.items[0]?.id ?? null);
+      } else {
+        setError(messageFor(requestError, "No se pudieron cargar las ordenes"));
+      }
     } finally {
       setLoading(false);
     }
-  }, [deferredSearch, page, request, scopedPath, statusFilter]);
+  }, [deferredSearch, owner, page, request, scopedPath, statusFilter]);
 
   const loadOptions = useCallback(async () => {
+    if (!owner) return;
     const sequence = ++optionsSequence.current;
+    const assetsPath = scopedPath("/assets");
     try {
       const [assetData, userData, inventoryData] = await Promise.all([
-        request<Asset[]>(scopedPath("/assets")),
+        request<Asset[]>(assetsPath),
         request<UserOption[]>("/users/options"),
         inventoryEnabled ? request<InventoryItem[]>("/inventory") : Promise.resolve([]),
       ]);
@@ -152,26 +178,50 @@ export default function WorkOrdersPage() {
         setAssets(assetData);
         setUsers(userData.filter((item) => item.active && ["TECHNICIAN", "MAINTENANCE_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(item.role)));
         setInventoryItems(inventoryData.filter((item) => item.active));
+        await Promise.all([
+          saveOfflineSnapshot(owner, `assets:${assetsPath}`, assetData),
+          saveOfflineSnapshot(owner, "users:options", userData),
+          saveOfflineSnapshot(owner, "inventory:items", inventoryData),
+        ]);
       }
     } catch (requestError) {
       if (sequence === optionsSequence.current) {
-        setError(messageFor(requestError, "No se pudieron cargar las opciones"));
+        if (isNetworkUnavailable(requestError)) {
+          const [cachedAssets, cachedUsers, cachedInventory] = await Promise.all([
+            loadOfflineSnapshot<Asset[]>(owner, `assets:${assetsPath}`),
+            loadOfflineSnapshot<UserOption[]>(owner, "users:options"),
+            loadOfflineSnapshot<InventoryItem[]>(owner, "inventory:items"),
+          ]);
+          setAssets(cachedAssets ?? []);
+          setUsers((cachedUsers ?? []).filter((item) => item.active && ["TECHNICIAN", "MAINTENANCE_MANAGER", "ADMIN", "SUPER_ADMIN"].includes(item.role)));
+          setInventoryItems((cachedInventory ?? []).filter((item) => item.active));
+        } else {
+          setError(messageFor(requestError, "No se pudieron cargar las opciones"));
+        }
       }
     }
-  }, [inventoryEnabled, request, scopedPath]);
+  }, [inventoryEnabled, owner, request, scopedPath]);
 
   const loadDetail = useCallback(async (orderId: string) => {
     setDetailLoading(true);
     setError("");
     try {
-      setDetail(await request<WorkOrderDetail>(`/work-orders/${orderId}`));
+      const loaded = await request<WorkOrderDetail>(`/work-orders/${orderId}`);
+      setDetail(loaded);
+      if (owner) await saveOfflineSnapshot(owner, `work-order:${orderId}`, loaded);
     } catch (requestError) {
-      setError(messageFor(requestError, "No se pudo cargar la intervencion"));
-      setDetail(null);
+      const cached = owner && isNetworkUnavailable(requestError)
+        ? await loadOfflineSnapshot<WorkOrderDetail>(owner, `work-order:${orderId}`)
+        : null;
+      if (cached) setDetail(cached);
+      else {
+        setError(messageFor(requestError, "No se pudo cargar la intervencion"));
+        setDetail(null);
+      }
     } finally {
       setDetailLoading(false);
     }
-  }, [request]);
+  }, [owner, request]);
 
   useEffect(() => {
     if (!plantsLoading) void loadOrders();
@@ -186,6 +236,10 @@ export default function WorkOrdersPage() {
 
   const mutate = useCallback(async (path: string, body: Record<string, unknown>, action: string) => {
     if (!detail) return false;
+    if (!online) {
+      setError("Esta accion requiere conexion para proteger la consistencia operativa.");
+      return false;
+    }
     setActing(action);
     setError("");
     try {
@@ -203,7 +257,7 @@ export default function WorkOrdersPage() {
     } finally {
       setActing("");
     }
-  }, [detail, loadOrders, request]);
+  }, [detail, loadOrders, online, request]);
 
   function openCreate() {
     setCreateForm({ ...emptyCreate, asset_id: assets[0]?.id ?? "" });
@@ -300,10 +354,42 @@ export default function WorkOrdersPage() {
 
   async function addWorkNote(event: FormEvent) {
     event.preventDefault();
+    if (!detail || !owner) return;
     setSaving(true);
-    const succeeded = await mutate("notes", noteForm, "note");
-    setSaving(false);
-    if (succeeded) setNoteForm({ note_type: "COMMENT", body: "" });
+    setError("");
+    setNotice("");
+    const clientRequestId = crypto.randomUUID();
+    const payload = { ...noteForm, client_request_id: clientRequestId };
+    try {
+      if (!navigator.onLine) throw new TypeError("offline");
+      const updated = await request<WorkOrderDetail>(`/work-orders/${detail.id}/notes`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      setDetail(updated);
+      await saveOfflineSnapshot(owner, `work-order:${detail.id}`, updated);
+      setDialog(null);
+      setNoteForm({ note_type: "COMMENT", body: "" });
+      setNotice("Nota registrada correctamente.");
+      await loadOrders();
+    } catch (requestError) {
+      if (isNetworkUnavailable(requestError)) {
+        await queueOfflineOperation({
+          ...owner,
+          id: clientRequestId,
+          type: "WORK_ORDER_NOTE",
+          path: `/work-orders/${detail.id}/notes`,
+          payload,
+        });
+        setDialog(null);
+        setNoteForm({ note_type: "COMMENT", body: "" });
+        setNotice("Nota guardada en este dispositivo. Se enviara al recuperar la conexion.");
+      } else {
+        setError(messageFor(requestError, "No se pudo registrar la nota"));
+      }
+    } finally {
+      setSaving(false);
+    }
   }
 
   function openMaterial() {
@@ -428,16 +514,16 @@ export default function WorkOrdersPage() {
   const activeParticipant = detail?.participants.find((item) => item.active && item.user_id === user?.id);
   const openSession = detail?.sessions.find((item) => item.user_id === user?.id && !item.ended_at);
   const operational = Boolean(detail && ["OPEN", "ASSIGNED", "IN_PROGRESS", "WAITING"].includes(detail.status));
-  const canStart = Boolean(canAct && detail && operational && activeParticipant && !openSession);
-  const canPause = Boolean(canAct && openSession);
-  const canComplete = Boolean(canAct && detail && operational && activeParticipant && (isManager || activeParticipant.role === "LEAD" || detail.assigned_to === user?.id));
+  const canStart = Boolean(online && canAct && detail && operational && activeParticipant && !openSession);
+  const canPause = Boolean(online && canAct && openSession);
+  const canComplete = Boolean(online && canAct && detail && operational && activeParticipant && (isManager || activeParticipant.role === "LEAD" || detail.assigned_to === user?.id));
   const canNote = Boolean(canAct && (isManager || activeParticipant));
-  const canChecklist = Boolean(canAct && operational && (isManager || activeParticipant));
+  const canChecklist = Boolean(online && canAct && operational && (isManager || activeParticipant));
   const canMaterial = Boolean(
-    canAct && inventoryEnabled && detail && ["ASSIGNED", "IN_PROGRESS", "WAITING"].includes(detail.status) && (isManager || activeParticipant),
+    online && canAct && inventoryEnabled && detail && ["ASSIGNED", "IN_PROGRESS", "WAITING"].includes(detail.status) && (isManager || activeParticipant),
   );
   const canReturnMaterial = Boolean(
-    canAct && inventoryEnabled && detail && ["ASSIGNED", "IN_PROGRESS", "WAITING", "PENDING_VALIDATION", "COMPLETED"].includes(detail.status) && (isManager || activeParticipant),
+    online && canAct && inventoryEnabled && detail && ["ASSIGNED", "IN_PROGRESS", "WAITING", "PENDING_VALIDATION", "COMPLETED"].includes(detail.status) && (isManager || activeParticipant),
   );
   const availableUsers = users.filter((candidate) => !detail?.participants.some((participant) => participant.active && participant.user_id === candidate.id));
   const selectedMaterial = inventoryItems.find((item) => item.id === materialForm.item_id);
@@ -453,10 +539,11 @@ export default function WorkOrdersPage() {
   return (
     <>
       <PageHeader
-        title="Ordenes de trabajo"
-        description="Intervenciones, responsables, tiempos y validacion del mantenimiento."
-        actions={isManager ? <button className="button-primary" onClick={openCreate}><Plus size={17} /> Nueva orden</button> : undefined}
+        title={user?.role === "TECHNICIAN" ? "Mi trabajo" : "Ordenes de trabajo"}
+        description={user?.role === "TECHNICIAN" ? "Intervenciones asignadas, ejecucion y trazabilidad desde planta." : "Intervenciones, responsables, tiempos y validacion del mantenimiento."}
+        actions={isManager && online ? <button className="button-primary" onClick={openCreate}><Plus size={17} /> Nueva orden</button> : undefined}
       />
+      {notice && <div className="notice-success" role="status">{notice}</div>}
       {error && <ErrorBanner message={error} />}
 
       <section className="panel mb-4 flex flex-col gap-3 p-3 sm:flex-row">
@@ -514,7 +601,7 @@ export default function WorkOrdersPage() {
             <WorkOrderDetailPanel
               detail={detail}
               userId={user?.id}
-              isManager={isManager}
+              isManager={isManager && online}
               canStart={canStart}
               canPause={canPause}
               canComplete={canComplete}

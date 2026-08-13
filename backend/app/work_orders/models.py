@@ -287,12 +287,22 @@ class WorkSession(UUIDPrimaryKeyMixin, TenantMixin, Base):
 
 class WorkOrderNote(UUIDPrimaryKeyMixin, TenantMixin, Base):
     __tablename__ = "work_order_notes"
-    __table_args__ = (Index("ix_work_order_notes_order_created", "work_order_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_work_order_notes_order_created", "work_order_id", "created_at"),
+        UniqueConstraint(
+            "company_id",
+            "work_order_id",
+            "author_id",
+            "client_request_id",
+            name="uq_work_order_note_client_request",
+        ),
+    )
 
     work_order_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("work_orders.id", ondelete="CASCADE"), nullable=False
     )
     author_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    client_request_id: Mapped[uuid.UUID | None] = mapped_column()
     note_type: Mapped[WorkOrderNoteType] = mapped_column(
         Enum(WorkOrderNoteType, name="work_order_note_type", native_enum=False, length=24),
         default=WorkOrderNoteType.COMMENT,

@@ -1,26 +1,39 @@
 # PWA y conectividad
 
-ForgeOps incluye manifest, iconos 192/512, service worker, estado online/offline e instalacion cuando el navegador expone el evento correspondiente.
+ForgeOps es instalable en escritorio, tablet y movil. El modo offline esta orientado a contingencias de cobertura en planta y conserva limites explicitos para proteger la consistencia industrial.
 
-## Cache
+## Sesion y aislamiento local
 
-El service worker aplica network-first a navegacion y cachea solo recursos estaticos controlados. No cachea `/api/` ni `/control`, evitando conservar respuestas industriales o del operador. Si una navegacion falla, muestra `/offline`.
+Tras un acceso online correcto se guarda una identidad local sin tokens durante un maximo de 24 horas. La cola y los snapshots se separan por `company_id` y `user_id`; cerrar sesion elimina los datos locales de esa cuenta. En dispositivos compartidos el usuario debe cerrar sesion al terminar.
+
+El modo offline nunca permite entrar al backoffice `/control` ni renueva permisos. Una cuenta caducada debe volver a autenticarse online.
+
+## Cache y snapshots
+
+El service worker aplica network-first y guarda el shell de las pantallas visitadas para poder abrirlas sin red. Nunca cachea `/api/` ni `/control`. IndexedDB conserva las ultimas plantas, activos, opciones, incidencias y ordenes consultadas por el usuario.
+
+Los snapshots son de solo lectura. Inventario, transiciones, tiempos, checklist, validaciones y administracion requieren conexion porque dependen de concurrencia o autorizacion actual.
 
 ## Cola local
 
-IndexedDB admite exclusivamente borradores de incidencia, notas de orden e inspecciones. Estados: `PENDING`, `SYNCING`, `FAILED`, `CONFLICT`. No se guardan contrasenas, JWT, datos de operador, documentos ni acciones administrativas.
+La version actual admite dos operaciones:
 
-La sincronizacion debe conservar idempotency key y version de entidad. Un `409` se presenta como conflicto; no sobrescribe silenciosamente trabajo remoto. En esta base la cola y estados estan preparados, mientras el envio automatico de cada formulario se integrara por modulo cuando sus contratos offline sean definitivos.
+- alta de incidencia;
+- nota de orden de trabajo.
 
-## UX
+Cada operacion incorpora un UUID generado por el cliente. PostgreSQL impone unicidad por tenant, autor y entidad para que una respuesta perdida o un reintento no duplique incidencias, notas, eventos ni notificaciones.
 
-La aplicacion muestra conectividad y pendientes sin bloquear lectura ya cargada. Los controles tactiles mantienen dimensiones estables. Recuperacion, mantenimiento y errores globales tienen pantallas propias sin detalles tecnicos.
+Estados: `PENDING`, `SYNCING`, `FAILED` y `CONFLICT`. La sincronizacion se ejecuta al recuperar red o por accion del usuario, procesa cronologicamente y detiene el lote ante una nueva perdida de conectividad. Un `409` queda visible para revision manual; no se aplica last-write-wins.
+
+No se guardan contrasenas, JWT, datos de operador, documentos, fotografias ni acciones administrativas.
 
 ## Validacion
 
-1. Abrir la aplicacion por HTTPS o localhost.
-2. Confirmar manifest e iconos en DevTools > Application.
-3. Confirmar que `sw.js` controla una recarga.
-4. Activar Offline, navegar y comprobar `/offline`.
-5. Verificar que API y `/control` no aparecen en Cache Storage.
-6. Probar instalacion en Chromium Android y escritorio.
+1. Abrir ForgeOps por HTTPS o localhost e iniciar sesion.
+2. Visitar incidencias y ordenes para generar snapshots.
+3. Confirmar manifest, iconos y control de `sw.js` en DevTools.
+4. Activar Offline y recargar una pantalla visitada.
+5. Crear una incidencia y una nota; comprobarlas en `/sync`.
+6. Recuperar red y verificar un unico registro remoto por operacion.
+7. Confirmar que Cache Storage no contiene API ni `/control`.
+8. Cerrar sesion y comprobar que IndexedDB no conserva datos de la cuenta.

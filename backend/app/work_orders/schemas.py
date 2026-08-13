@@ -131,6 +131,7 @@ class WorkSessionRead(ORMModel):
 
 
 class WorkOrderNoteCreate(BaseModel):
+    client_request_id: UUID | None = None
     note_type: WorkOrderNoteType = WorkOrderNoteType.COMMENT
     body: str = Field(min_length=2, max_length=4000)
 
@@ -138,6 +139,7 @@ class WorkOrderNoteCreate(BaseModel):
 class WorkOrderNoteRead(ORMModel):
     id: UUID
     author_id: UUID | None
+    client_request_id: UUID | None
     note_type: WorkOrderNoteType
     body: str
     created_at: datetime

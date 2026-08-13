@@ -61,6 +61,8 @@ const labels: Record<string, string> = {
   SAFETY: "Seguridad",
   OTHER: "Otro",
   PENDING: "Pendiente",
+  SYNCING: "Sincronizando",
+  CONFLICT: "Conflicto",
   INDEXING: "Indexando",
   READY: "Disponible",
   FAILED: "Error",
