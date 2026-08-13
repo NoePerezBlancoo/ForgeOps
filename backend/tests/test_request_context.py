@@ -42,7 +42,29 @@ def test_client_ip_rejects_malformed_forwarded_value():
     previous = settings.client_ip_source
     settings.client_ip_source = "x-real-ip"
     try:
-        request = build_request(client="10.0.0.7", real_ip="203.0.113.8, 198.51.100.2")
+        invalid_ips = ["not-an-ip", "256.0.0.1", "203.0.113.8, 198.51.100.2"]
+        for invalid_ip in invalid_ips:
+            request = build_request(client="10.0.0.7", real_ip=invalid_ip)
+            assert get_client_ip(request) == "10.0.0.7"
+    finally:
+        settings.client_ip_source = previous
+
+
+def test_client_ip_falls_back_to_direct_when_header_is_missing():
+    previous = settings.client_ip_source
+    settings.client_ip_source = "x-real-ip"
+    try:
+        request = build_request(client="10.0.0.7", real_ip=None)
         assert get_client_ip(request) == "10.0.0.7"
+    finally:
+        settings.client_ip_source = previous
+
+
+def test_client_ip_returns_none_when_both_addresses_missing():
+    previous = settings.client_ip_source
+    settings.client_ip_source = "x-real-ip"
+    try:
+        request = build_request(client=None, real_ip=None)
+        assert get_client_ip(request) is None
     finally:
         settings.client_ip_source = previous
