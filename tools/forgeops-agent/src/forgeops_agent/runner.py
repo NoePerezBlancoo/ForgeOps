@@ -132,9 +132,9 @@ class OpenHandsRunner(LocalAgentRunner):
             "--security-opt",
             "no-new-privileges",
             "--tmpfs",
-            "/tmp:rw,nosuid,size=2g",
+            "/tmp:rw,nosuid,nodev,mode=1777,size=2g",
             "--tmpfs",
-            "/home/agent:rw,nosuid,size=512m",
+            "/home/agent:rw,nosuid,nodev,uid=10001,gid=10001,mode=0700,size=512m",
             "-v",
             f"{worktree}:/workspace:rw",
             "-v",
@@ -161,6 +161,8 @@ class OpenHandsRunner(LocalAgentRunner):
             f"MAX_ITERATIONS={self.config.max_iterations}",
             "-e",
             "DISABLE_COLOR=true",
+            "-e",
+            "OPENHANDS_SUPPRESS_BANNER=1",
         ]
         if task.allow_network:
             command.extend(["--add-host", "host.docker.internal:host-gateway"])
