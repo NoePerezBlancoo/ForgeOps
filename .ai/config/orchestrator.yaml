@@ -1,0 +1,39 @@
+version: 1
+
+agent:
+  provider: aider
+  image: forgeops-local-agent:1.0
+  gateway_image: forgeops-ollama-gateway:1.0
+  version: 0.86.0
+
+execution:
+  max_parallel_tasks: 1
+  max_iterations: 40
+  default_timeout_minutes: 60
+  idle_poll_seconds: 30
+
+git:
+  worktrees_root: ../ForgeOps-agent-worktrees
+  protected_branches:
+    - main
+    - master
+    - production
+    - release
+
+security:
+  automatic_risks:
+    - LOW
+  allow_push: false
+  allow_merge: false
+  allow_production: false
+
+resources:
+  max_cpu_percent: 95
+  min_free_memory_gb: 4
+  min_free_disk_gb: 50
+  max_gpu_temperature_c: 84
+  container_cpus: 8
+  container_memory: 10g
+
+reports:
+  log_max_bytes: 10485760

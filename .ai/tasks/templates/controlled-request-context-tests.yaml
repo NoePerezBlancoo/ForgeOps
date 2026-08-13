@@ -1,0 +1,23 @@
+id: AI-0005
+title: Complete request context edge tests
+objective: Add focused tests for the missing X-Real-IP fallback and the absence of both forwarded and direct client addresses without changing production code.
+allowed_paths:
+  - backend/tests/test_request_context.py
+forbidden_paths:
+  - backend/app/
+  - backend/alembic/
+required_checks:
+  - backend-ruff
+  - pytest:tests/test_request_context.py
+max_attempts: 2
+timeout_minutes: 30
+allow_commit: true
+allow_push: false
+allow_merge: false
+allow_network: false
+risk: LOW
+preferred_model: auto
+depends_on: []
+context_files:
+  - backend/app/core/request.py
+  - backend/tests/test_request_context.py

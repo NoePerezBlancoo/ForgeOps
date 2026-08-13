@@ -1,0 +1,16 @@
+id: AI-0100
+title: Add scoped CRUD component
+objective: Implement one bounded CRUD component following an approved contract and existing project patterns.
+allowed_paths:
+  - frontend/components/
+required_checks:
+  - frontend-quality
+max_attempts: 2
+timeout_minutes: 120
+allow_commit: true
+allow_push: false
+allow_merge: false
+allow_network: false
+risk: MEDIUM
+preferred_model: auto
+depends_on: []

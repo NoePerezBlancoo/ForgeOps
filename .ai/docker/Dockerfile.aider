@@ -1,0 +1,18 @@
+FROM python:3.12-slim-bookworm
+
+ARG AIDER_VERSION=0.86.0
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir "aider-chat==${AIDER_VERSION}" \
+    && useradd --create-home --uid 10001 --shell /bin/bash agent \
+    && mkdir -p /workspace /task \
+    && chown -R agent:agent /workspace /task
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    NO_COLOR=1
+
+USER agent
+WORKDIR /workspace

@@ -1,0 +1,51 @@
+version: 1
+
+paths:
+  always_forbidden:
+    - .git/
+    - .ai/
+    - .github/
+    - .githooks/
+    - .openhands/
+    - .aider.conf.yml
+    - .aider.model.settings.yml
+    - .railway/
+    - deploy/
+    - .env
+    - .env.local
+    - .env.demo
+    - .env.staging
+    - .env.production
+
+commands:
+  denied_patterns:
+    - "rm -rf"
+    - "git push"
+    - "git commit"
+    - "git merge"
+    - "git reset --hard"
+    - "git checkout --"
+    - "git clean"
+    - "git worktree"
+    - "railway"
+    - "gh repo delete"
+    - "DROP DATABASE"
+    - "DROP SCHEMA"
+    - "diskpart"
+    - "format "
+    - "shutdown"
+    - "reboot"
+
+environment:
+  inherit_mode: whitelist
+  forbidden_prefixes:
+    - AWS_
+    - GITHUB_
+    - RAILWAY_
+    - S3_
+    - SMTP_
+  forbidden_names:
+    - DATABASE_URL
+    - MIGRATION_DATABASE_URL
+    - SECRET_KEY
+    - OPENAI_API_KEY
