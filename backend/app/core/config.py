@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,7 +10,10 @@ class Settings(BaseSettings):
     app_name: str = "ForgeOps API"
     app_env: Literal["development", "testing", "staging", "production"] = "development"
     app_version: str = "1.2.2"
-    build_commit: str = "local"
+    build_commit: str = Field(
+        default="local",
+        validation_alias=AliasChoices("RAILWAY_GIT_COMMIT_SHA", "BUILD_COMMIT"),
+    )
     api_prefix: str = "/api/v1"
     api_url: str = "http://localhost:8000"
     frontend_url: str = "http://localhost:3000"
