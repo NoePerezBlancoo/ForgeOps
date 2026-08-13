@@ -15,6 +15,30 @@ from app.core.enums import (
 from app.core.schemas import AssetSummary, ORMModel, UserSummary
 
 
+class WorkOrderChecklistItemUpdate(BaseModel):
+    completed: bool
+    notes: str | None = Field(default=None, max_length=4000)
+    version: int = Field(ge=1)
+
+
+class WorkOrderChecklistItemRead(ORMModel):
+    id: UUID
+    company_id: UUID
+    work_order_id: UUID
+    source_template_item_id: UUID | None
+    title: str
+    instructions: str | None
+    position: int
+    required: bool
+    completed_by: UUID | None
+    completed_at: datetime | None
+    notes: str | None
+    version: int
+    created_at: datetime
+    updated_at: datetime
+    completer: UserSummary | None
+
+
 class WorkOrderCreate(BaseModel):
     plant_id: UUID
     asset_id: UUID
@@ -136,6 +160,7 @@ class WorkOrderDetailRead(WorkOrderRead):
     sessions: list[WorkSessionRead]
     notes: list[WorkOrderNoteRead]
     events: list[WorkOrderEventRead]
+    checklist_items: list[WorkOrderChecklistItemRead]
 
 
 class WorkSessionCommand(BaseModel):
