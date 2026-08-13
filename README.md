@@ -11,7 +11,7 @@ La version **1.2.3 Production Deployment Foundation** convierte el piloto funcio
 - Incidencias y ordenes con asignacion, prioridad e historial.
 - Listados de activos, incidencias y ordenes paginados y filtrados en servidor.
 - Preventivos con checklists reutilizables, ejecucion trazable y generacion programable de OT.
-- Inventario y movimientos de repuesto.
+- Inventario transaccional integrado con OT, costes historicos, devoluciones y alertas de minimo.
 - Documentos privados, extraccion, pgvector y RAG con fuentes.
 - Usuarios y roles por empresa con invitaciones seguras y activacion por el empleado.
 - Centro de notificaciones para trabajos asignados y alertas operativas.

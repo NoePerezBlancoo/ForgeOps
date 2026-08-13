@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     JSON,
@@ -140,6 +141,18 @@ class WorkOrder(UUIDPrimaryKeyMixin, TenantMixin, Base):
         order_by="WorkOrderChecklistItem.position",
         passive_deletes=True,
     )
+    inventory_movements: Mapped[list["InventoryMovement"]] = relationship(  # noqa: F821
+        back_populates="work_order",
+        order_by="InventoryMovement.created_at",
+        passive_deletes=True,
+    )
+
+    @property
+    def material_cost(self) -> Decimal:
+        return sum(
+            (Decimal(movement.total_cost) for movement in self.inventory_movements),
+            Decimal("0.00"),
+        )
 
     __mapper_args__ = {"version_id_col": version}
 

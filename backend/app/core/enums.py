@@ -117,6 +117,8 @@ class WorkOrderEventType(StrEnum):
     VALIDATED = "VALIDATED"
     CLOSED = "CLOSED"
     REOPENED = "REOPENED"
+    MATERIAL_CONSUMED = "MATERIAL_CONSUMED"
+    MATERIAL_RETURNED = "MATERIAL_RETURNED"
 
 
 class FrequencyType(StrEnum):
@@ -130,6 +132,7 @@ class InventoryMovementType(StrEnum):
     RECEIPT = "RECEIPT"
     CONSUMPTION = "CONSUMPTION"
     ADJUSTMENT = "ADJUSTMENT"
+    RETURN = "RETURN"
 
 
 class DocumentType(StrEnum):

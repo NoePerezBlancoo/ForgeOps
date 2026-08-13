@@ -20,6 +20,9 @@ ForgeOps 1.2.3 convierte el despliegue en un proceso verificable. La promocion d
 - Planes preventivos con checklists reutilizables y snapshot historico por orden.
 - Ejecucion de checklist con autoria, fecha, concurrencia optimista y cierre controlado.
 - Generador de ordenes vencidas preparado para ejecucion periodica sin estado.
+- Consumos y devoluciones de repuestos vinculados a la OT con trazabilidad inmutable.
+- Coste unitario historico, coste material neto por orden y control optimista del stock.
+- Alertas de stock minimo y enlaces bidireccionales entre inventario e intervenciones.
 
 ## Estado de validacion
 
@@ -33,6 +36,7 @@ ForgeOps 1.2.3 convierte el despliegue en un proceso verificable. La promocion d
 | Notificaciones in-app | `TESTED` | OT asignada, incidencia critica, destinatario, lectura y enlaces profundos |
 | Mantenimiento preventivo | `TESTED` | Migracion reversible, generacion atomica, snapshots, RLS y QA responsive |
 | Scheduler preventivo | `IMPLEMENTED` | Comando idempotente preparado para Railway Cron; despliegue externo pendiente |
+| Inventario integrado con OT | `TESTED` | Migracion reversible, concurrencia, costes, devoluciones, RLS y QA responsive |
 | Staging V1.2.2 | `STAGING_VALIDATED` | Release validator remoto con health, readiness y frontend |
 | Staging V1.2.3 | `EXTERNAL_BLOCKER` | `RAILWAY_STAGING_ENABLED=false` |
 | PostgreSQL/RLS y worker local | `TESTED` | PostgreSQL 17, rol runtime y roundtrip Redis ejecutados |

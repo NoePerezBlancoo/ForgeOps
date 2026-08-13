@@ -71,6 +71,9 @@ operators   identidad propietaria y gobierno de plataforma
 - Nucleo operativo siempre activo; modulos opcionales protegidos tanto en API como en UI.
 - Identidad de operador separada de usuarios tenant, con tokens, sesiones, cookie y auditoria propios.
 - MFA TOTP obligatorio para `/control`, codigos no reutilizables y bloqueo temporal por intentos.
+- Movimientos de inventario inmutables; las devoluciones compensan un consumo original sin reescribirlo.
+- Version optimista y bloqueo de fila para impedir descuentos concurrentes o stock negativo.
+- Coste unitario congelado en cada movimiento y coste neto firmado agregado por orden.
 
 ## Modulos comerciales
 

@@ -26,6 +26,7 @@ Fecha de auditoria: 2026-08-13.
 | Trazabilidad de intervenciones | `TESTED` | PostgreSQL real, ciclo multi-tecnico, permisos, historial inmutable y UI responsive |
 | Usuarios, invitaciones y notificaciones | `TESTED` | Invitacion de un solo uso, plazas, RLS, correo durable, avisos de dominio y UI responsive |
 | Mantenimiento preventivo | `TESTED` | Checklists historicos, generacion atomica, scheduler, RLS y ejecucion responsive |
+| Inventario integrado con OT | `TESTED` | Stock transaccional, costes historicos, devoluciones compensatorias, RLS y UI responsive |
 | PWA basica | `IMPLEMENTED` | Manifest, service worker, shell offline y cola local |
 | Railway staging V1.2.2 | `STAGING_VALIDATED` | Health, readiness, Redis, frontend y validador remoto comprobados |
 | Railway staging automatico | `EXTERNAL_BLOCKER` | Variable GitHub `RAILWAY_STAGING_ENABLED=false` |
@@ -44,9 +45,10 @@ Fecha de auditoria: 2026-08-13.
 | C | Intervention Traceability | Historial inmutable, varios tecnicos, sesiones, notas, estados y validacion | `TESTED` |
 | D | Users and Notifications | Invitaciones seguras, activacion, plazas, correo y avisos in-app | `TESTED` |
 | E | Preventive Maintenance | Planes recurrentes, checklists trazables y generacion automatizable de OT | `TESTED` |
+| F | Inventory Integration | Consumos y devoluciones por OT, stock concurrente, costes y alertas | `TESTED` |
 | M | Production Release | Cutover autorizado, observacion y validacion productiva | `EXTERNAL_BLOCKER` |
 
-La secuencia restante conserva este orden de dependencias: Inventory Integration, Technician PWA, Reporting, Product UX, Commercial Readiness, Assurance y Release Candidate. Cada fase recibira uno de los estados permitidos cuando exista implementacion o evidencia; no se asigna un estado anticipado.
+La secuencia restante conserva este orden de dependencias: Technician PWA, Reporting, Product UX, Commercial Readiness, Assurance y Release Candidate. Cada fase recibira uno de los estados permitidos cuando exista implementacion o evidencia; no se asigna un estado anticipado.
 
 ## Backlog activo
 
@@ -95,13 +97,13 @@ Estado: `TESTED`. Validado con 61 pruebas backend, 4 pruebas PostgreSQL/RLS, 84 
 
 ### Phase F - Inventory Integration
 
-- `AI-0501`: contratos de consumo de repuestos por OT y movimientos inmutables.
+- `AI-0501`: contratos delegados a Qwen; `FAILED` por lint y fallback Devstral sin resultado, revisados e implementados bajo control de Codex.
 - `FO-0502`: stock transaccional, version optimista y prevencion de saldo negativo.
 - `FO-0503`: coste historico de consumo y agregado de materiales por OT.
 - `AI-0504`: experiencia tactil de consumo, devolucion y ajuste con permisos.
 - `FO-0505`: alertas de minimo, aislamiento RLS, pruebas y QA responsive.
 
-Estado: pendiente de implementacion.
+Estado: `TESTED`. Validado con 66 pruebas backend, 5 pruebas PostgreSQL/RLS, 84,28 % de cobertura, migraciones reversibles, build de produccion y recorrido real de consumo/devolucion en 390 y 1280 px.
 
 ## Gates de promocion
 

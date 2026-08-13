@@ -4,9 +4,9 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user, require_roles
+from app.auth.dependencies import get_current_user, require_module, require_roles
 from app.core.database import get_db
-from app.core.enums import Priority, UserRole, WorkOrderStatus
+from app.core.enums import CompanyModule, Priority, UserRole, WorkOrderStatus
 from app.core.schemas import Page
 from app.users.models import User
 from app.work_orders.schemas import (
@@ -14,6 +14,8 @@ from app.work_orders.schemas import (
     WorkOrderComplete,
     WorkOrderCreate,
     WorkOrderDetailRead,
+    WorkOrderMaterialConsume,
+    WorkOrderMaterialReturn,
     WorkOrderNoteCreate,
     WorkOrderParticipantCreate,
     WorkOrderRead,
@@ -27,6 +29,7 @@ from app.work_orders.service import (
     add_participant,
     close_work,
     complete_work,
+    consume_material,
     create_work_order,
     get_work_order_detail,
     list_work_orders,
@@ -34,6 +37,7 @@ from app.work_orders.service import (
     pause_work,
     remove_participant,
     reopen_work,
+    return_material,
     start_work,
     update_checklist_item,
     update_work_order,
@@ -181,6 +185,35 @@ def update_checklist(
     current_user: User = Depends(order_actors),
 ):
     return update_checklist_item(db, current_user, order_id, item_id, payload)
+
+
+@router.post(
+    "/{order_id}/materials",
+    response_model=WorkOrderDetailRead,
+    dependencies=[Depends(require_module(CompanyModule.INVENTORY))],
+)
+def consume_order_material(
+    order_id: uuid.UUID,
+    payload: WorkOrderMaterialConsume,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(order_actors),
+):
+    return consume_material(db, current_user, order_id, payload)
+
+
+@router.post(
+    "/{order_id}/materials/{movement_id}/return",
+    response_model=WorkOrderDetailRead,
+    dependencies=[Depends(require_module(CompanyModule.INVENTORY))],
+)
+def return_order_material(
+    order_id: uuid.UUID,
+    movement_id: uuid.UUID,
+    payload: WorkOrderMaterialReturn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(order_actors),
+):
+    return return_material(db, current_user, order_id, movement_id, payload)
 
 
 @router.post("/{order_id}/complete", response_model=WorkOrderDetailRead)

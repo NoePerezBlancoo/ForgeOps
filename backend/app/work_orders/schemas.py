@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -13,6 +14,7 @@ from app.core.enums import (
     WorkSessionEndReason,
 )
 from app.core.schemas import AssetSummary, ORMModel, UserSummary
+from app.inventory.schemas import InventoryMovementRead
 
 
 class WorkOrderChecklistItemUpdate(BaseModel):
@@ -161,6 +163,8 @@ class WorkOrderDetailRead(WorkOrderRead):
     notes: list[WorkOrderNoteRead]
     events: list[WorkOrderEventRead]
     checklist_items: list[WorkOrderChecklistItemRead]
+    inventory_movements: list[InventoryMovementRead]
+    material_cost: Decimal
 
 
 class WorkSessionCommand(BaseModel):
@@ -181,3 +185,16 @@ class WorkOrderValidation(BaseModel):
 
 class WorkOrderReopen(BaseModel):
     reason: str = Field(min_length=5, max_length=2000)
+
+
+class WorkOrderMaterialConsume(BaseModel):
+    item_id: UUID
+    quantity: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
+    expected_version: int = Field(ge=1)
+    reason: str | None = Field(default=None, min_length=4, max_length=255)
+
+
+class WorkOrderMaterialReturn(BaseModel):
+    quantity: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
+    expected_version: int = Field(ge=1)
+    reason: str | None = Field(default=None, min_length=4, max_length=255)

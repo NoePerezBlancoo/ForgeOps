@@ -26,6 +26,7 @@ class InventoryItemCreate(BaseModel):
 
 
 class InventoryItemUpdate(BaseModel):
+    expected_version: int = Field(ge=1)
     code: str | None = Field(default=None, min_length=2, max_length=60)
     name: str | None = Field(default=None, min_length=3, max_length=180)
     description: str | None = Field(default=None, max_length=3000)
@@ -53,6 +54,7 @@ class InventoryItemRead(ORMModel):
     location: str | None
     cost: Decimal | None
     active: bool
+    version: int
     created_at: datetime
     updated_at: datetime
 
@@ -62,10 +64,18 @@ class InventoryItemRead(ORMModel):
         return self.stock <= self.minimum_stock
 
 
+class InventoryItemSummary(ORMModel):
+    id: UUID
+    code: str
+    name: str
+    unit: str
+
+
 class StockMovementCreate(BaseModel):
     movement_type: InventoryMovementType
     quantity: Decimal = Field(decimal_places=3)
     reason: str = Field(min_length=4, max_length=255)
+    expected_version: int = Field(ge=1)
 
     @field_validator("quantity")
     @classmethod
@@ -77,11 +87,17 @@ class StockMovementCreate(BaseModel):
 
 class InventoryMovementRead(ORMModel):
     id: UUID
+    company_id: UUID
     item_id: UUID
     user_id: UUID
+    work_order_id: UUID | None
+    reversal_of_id: UUID | None
     movement_type: InventoryMovementType
     quantity: Decimal
     resulting_stock: Decimal
+    unit_cost: Decimal
+    total_cost: Decimal
     reason: str
     created_at: datetime
     user: UserSummary
+    item: InventoryItemSummary

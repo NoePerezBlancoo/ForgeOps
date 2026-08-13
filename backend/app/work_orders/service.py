@@ -1,6 +1,7 @@
 import math
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from fastapi import HTTPException
 from sqlalchemy import and_, func, or_, select
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.assets.models import Asset
 from app.audit.service import add_audit_event
 from app.core.enums import (
+    InventoryMovementType,
     NotificationType,
     Priority,
     UserRole,
@@ -20,6 +22,8 @@ from app.core.enums import (
 )
 from app.core.pagination import paginate
 from app.incidents.models import Incident
+from app.inventory.models import InventoryItem, InventoryMovement
+from app.inventory.service import create_low_stock_notifications
 from app.notifications.service import create_notification
 from app.users.models import User
 from app.work_orders.models import (
@@ -34,6 +38,8 @@ from app.work_orders.schemas import (
     WorkOrderChecklistItemUpdate,
     WorkOrderComplete,
     WorkOrderCreate,
+    WorkOrderMaterialConsume,
+    WorkOrderMaterialReturn,
     WorkOrderNoteCreate,
     WorkOrderParticipantCreate,
     WorkOrderReopen,
@@ -80,6 +86,12 @@ def _base_query(detail: bool = False):
                 selectinload(WorkOrder.events).joinedload(WorkOrderEvent.actor),
                 selectinload(WorkOrder.checklist_items).joinedload(
                     WorkOrderChecklistItem.completer
+                ),
+                selectinload(WorkOrder.inventory_movements).joinedload(
+                    InventoryMovement.user
+                ),
+                selectinload(WorkOrder.inventory_movements).joinedload(
+                    InventoryMovement.item
                 ),
             ]
         )
@@ -621,6 +633,200 @@ def update_checklist_item(
     )
     db.commit()
     return get_work_order_detail(db, current_user, order.id)
+
+
+def consume_material(
+    db: Session,
+    current_user: User,
+    order_id: uuid.UUID,
+    payload: WorkOrderMaterialConsume,
+) -> WorkOrder:
+    order = _lock_order(db, current_user, order_id)
+    _require_material_access(db, order, current_user, allow_return=False)
+    item = _lock_inventory_item(db, current_user.company_id, payload.item_id)
+    _check_inventory_version(item, payload.expected_version)
+
+    quantity = Decimal(payload.quantity)
+    previous_stock = Decimal(item.stock)
+    resulting_stock = previous_stock - quantity
+    if resulting_stock < 0:
+        raise HTTPException(status_code=409, detail="Stock insuficiente para el consumo")
+
+    unit_cost = Decimal(item.cost or 0).quantize(Decimal("0.01"))
+    total_cost = (quantity * unit_cost).quantize(Decimal("0.01"))
+    item.stock = resulting_stock
+    movement = InventoryMovement(
+        company_id=order.company_id,
+        item_id=item.id,
+        user_id=current_user.id,
+        work_order_id=order.id,
+        movement_type=InventoryMovementType.CONSUMPTION,
+        quantity=-quantity,
+        resulting_stock=resulting_stock,
+        unit_cost=unit_cost,
+        total_cost=total_cost,
+        reason=(payload.reason or f"Consumo en {order.number}").strip(),
+    )
+    db.add(movement)
+    db.flush()
+    _append_event(
+        db,
+        order,
+        current_user,
+        WorkOrderEventType.MATERIAL_CONSUMED,
+        f"{current_user.full_name} ha consumido {quantity} {item.unit} de {item.code}",
+        _material_event_details(movement, item),
+    )
+    create_low_stock_notifications(db, item, previous_stock, movement.id)
+    add_audit_event(
+        db,
+        order.company_id,
+        current_user.id,
+        "CONSUME_MATERIAL",
+        "WORK_ORDER",
+        f"{quantity} {item.unit} de {item.code} consumidos en {order.number}",
+        order.id,
+    )
+    db.commit()
+    return get_work_order_detail(db, current_user, order.id)
+
+
+def return_material(
+    db: Session,
+    current_user: User,
+    order_id: uuid.UUID,
+    movement_id: uuid.UUID,
+    payload: WorkOrderMaterialReturn,
+) -> WorkOrder:
+    order = _lock_order(db, current_user, order_id)
+    _require_material_access(db, order, current_user, allow_return=True)
+    original = db.scalar(
+        select(InventoryMovement)
+        .where(
+            InventoryMovement.id == movement_id,
+            InventoryMovement.company_id == current_user.company_id,
+            InventoryMovement.work_order_id == order.id,
+            InventoryMovement.movement_type == InventoryMovementType.CONSUMPTION,
+        )
+        .with_for_update()
+    )
+    if not original:
+        raise HTTPException(status_code=404, detail="Consumo de material no encontrado")
+
+    item = _lock_inventory_item(db, current_user.company_id, original.item_id)
+    _check_inventory_version(item, payload.expected_version)
+    returned_quantity = db.scalar(
+        select(func.coalesce(func.sum(InventoryMovement.quantity), 0)).where(
+            InventoryMovement.reversal_of_id == original.id,
+            InventoryMovement.movement_type == InventoryMovementType.RETURN,
+        )
+    )
+    available = abs(Decimal(original.quantity)) - Decimal(returned_quantity or 0)
+    quantity = Decimal(payload.quantity)
+    if quantity > available:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Solo quedan {available} unidades disponibles para devolver",
+        )
+
+    resulting_stock = Decimal(item.stock) + quantity
+    unit_cost = Decimal(original.unit_cost)
+    movement = InventoryMovement(
+        company_id=order.company_id,
+        item_id=item.id,
+        user_id=current_user.id,
+        work_order_id=order.id,
+        reversal_of_id=original.id,
+        movement_type=InventoryMovementType.RETURN,
+        quantity=quantity,
+        resulting_stock=resulting_stock,
+        unit_cost=unit_cost,
+        total_cost=-(quantity * unit_cost).quantize(Decimal("0.01")),
+        reason=(payload.reason or f"Devolucion desde {order.number}").strip(),
+    )
+    item.stock = resulting_stock
+    db.add(movement)
+    db.flush()
+    _append_event(
+        db,
+        order,
+        current_user,
+        WorkOrderEventType.MATERIAL_RETURNED,
+        f"{current_user.full_name} ha devuelto {quantity} {item.unit} de {item.code}",
+        _material_event_details(movement, item),
+    )
+    add_audit_event(
+        db,
+        order.company_id,
+        current_user.id,
+        "RETURN_MATERIAL",
+        "WORK_ORDER",
+        f"{quantity} {item.unit} de {item.code} devueltos desde {order.number}",
+        order.id,
+    )
+    db.commit()
+    return get_work_order_detail(db, current_user, order.id)
+
+
+def _require_material_access(
+    db: Session,
+    order: WorkOrder,
+    current_user: User,
+    *,
+    allow_return: bool,
+) -> None:
+    allowed_statuses = {
+        WorkOrderStatus.ASSIGNED,
+        WorkOrderStatus.IN_PROGRESS,
+        WorkOrderStatus.WAITING,
+    }
+    if allow_return:
+        allowed_statuses.update(
+            {WorkOrderStatus.PENDING_VALIDATION, WorkOrderStatus.COMPLETED}
+        )
+    if order.status not in allowed_statuses:
+        raise HTTPException(status_code=409, detail="La orden no admite movimientos de material")
+    if current_user.role == UserRole.TECHNICIAN:
+        _active_participant(db, order, current_user)
+
+
+def _lock_inventory_item(
+    db: Session, company_id: uuid.UUID, item_id: uuid.UUID
+) -> InventoryItem:
+    item = db.scalar(
+        select(InventoryItem)
+        .where(
+            InventoryItem.id == item_id,
+            InventoryItem.company_id == company_id,
+            InventoryItem.active.is_(True),
+        )
+        .with_for_update()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Repuesto no encontrado")
+    return item
+
+
+def _check_inventory_version(item: InventoryItem, expected_version: int) -> None:
+    if item.version != expected_version:
+        raise HTTPException(
+            status_code=409,
+            detail="El stock ha cambiado. Recarga la orden antes de continuar",
+        )
+
+
+def _material_event_details(
+    movement: InventoryMovement, item: InventoryItem
+) -> dict[str, str]:
+    return {
+        "movement_id": str(movement.id),
+        "item_id": str(item.id),
+        "item_code": item.code,
+        "quantity": str(movement.quantity),
+        "unit": item.unit,
+        "unit_cost": str(movement.unit_cost),
+        "total_cost": str(movement.total_cost),
+    }
 
 
 def complete_work(

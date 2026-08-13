@@ -5,11 +5,15 @@ from fastapi import HTTPException
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm.exc import StaleDataError
 
-from app.core.enums import InventoryMovementType
+from app.core.enums import InventoryMovementType, NotificationType, UserRole
 from app.inventory.models import InventoryItem, InventoryMovement
 from app.inventory.schemas import InventoryItemCreate, InventoryItemUpdate, StockMovementCreate
+from app.notifications.service import create_notification
 from app.users.models import User
+
+MANAGER_ROLES = (UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MAINTENANCE_MANAGER)
 
 
 def list_items(
@@ -54,6 +58,8 @@ def create_item(db: Session, current_user: User, payload: InventoryItemCreate) -
                     movement_type=InventoryMovementType.RECEIPT,
                     quantity=initial_stock,
                     resulting_stock=initial_stock,
+                    unit_cost=item.cost or Decimal("0.00"),
+                    total_cost=Decimal("0.00"),
                     reason="Stock inicial",
                 )
             )
@@ -70,11 +76,24 @@ def update_item(
     item_id: uuid.UUID,
     payload: InventoryItemUpdate,
 ) -> InventoryItem:
+    values = payload.model_dump(exclude_unset=True)
+    expected_version = values.pop("expected_version")
     item = get_item(db, current_user.company_id, item_id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    if item.version != expected_version:
+        raise HTTPException(
+            status_code=409,
+            detail="El repuesto ha cambiado. Recarga el inventario antes de continuar",
+        )
+    for field, value in values.items():
         setattr(item, field, value)
     try:
         db.commit()
+    except StaleDataError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="El repuesto ha cambiado. Recarga el inventario antes de continuar",
+        ) from exc
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="El codigo del repuesto ya existe") from exc
@@ -98,6 +117,16 @@ def register_movement(
     )
     if not item:
         raise HTTPException(status_code=404, detail="Repuesto no encontrado")
+    if item.version != payload.expected_version:
+        raise HTTPException(
+            status_code=409,
+            detail="El stock ha cambiado. Recarga el inventario antes de continuar",
+        )
+    if payload.movement_type == InventoryMovementType.RETURN:
+        raise HTTPException(
+            status_code=422,
+            detail="Las devoluciones se registran desde la orden de trabajo",
+        )
 
     quantity = Decimal(payload.quantity)
     if payload.movement_type == InventoryMovementType.CONSUMPTION:
@@ -110,6 +139,7 @@ def register_movement(
     if resulting_stock < 0:
         raise HTTPException(status_code=409, detail="Stock insuficiente para el consumo")
 
+    previous_stock = Decimal(item.stock)
     item.stock = resulting_stock
     movement = InventoryMovement(
         company_id=current_user.company_id,
@@ -118,13 +148,19 @@ def register_movement(
         movement_type=payload.movement_type,
         quantity=delta,
         resulting_stock=resulting_stock,
+        unit_cost=item.cost or Decimal("0.00"),
+        total_cost=Decimal("0.00"),
         reason=payload.reason.strip(),
     )
     db.add(movement)
+    db.flush()
+    create_low_stock_notifications(db, item, previous_stock, movement.id)
     db.commit()
     return db.scalar(
         select(InventoryMovement)
-        .options(joinedload(InventoryMovement.user))
+        .options(
+            joinedload(InventoryMovement.user), joinedload(InventoryMovement.item)
+        )
         .where(InventoryMovement.id == movement.id)
     )
 
@@ -136,7 +172,9 @@ def list_movements(
     return list(
         db.scalars(
             select(InventoryMovement)
-            .options(joinedload(InventoryMovement.user))
+            .options(
+                joinedload(InventoryMovement.user), joinedload(InventoryMovement.item)
+            )
             .where(
                 InventoryMovement.company_id == company_id,
                 InventoryMovement.item_id == item_id,
@@ -145,3 +183,35 @@ def list_movements(
             .limit(100)
         )
     )
+
+
+def create_low_stock_notifications(
+    db: Session,
+    item: InventoryItem,
+    previous_stock: Decimal,
+    movement_id: uuid.UUID,
+) -> None:
+    minimum = Decimal(item.minimum_stock)
+    if previous_stock <= minimum or Decimal(item.stock) > minimum:
+        return
+    recipients = db.scalars(
+        select(User.id).where(
+            User.company_id == item.company_id,
+            User.active.is_(True),
+            User.role.in_(MANAGER_ROLES),
+        )
+    )
+    for recipient_id in recipients:
+        create_notification(
+            db,
+            company_id=item.company_id,
+            recipient_id=recipient_id,
+            notification_type=NotificationType.LOW_STOCK,
+            title=f"Stock bajo: {item.code}",
+            body=(
+                f"{item.name} queda en {item.stock} {item.unit}; "
+                f"el minimo es {item.minimum_stock} {item.unit}."
+            ),
+            href="/inventory",
+            dedupe_key=f"low-stock:{item.id}:{movement_id}:{recipient_id}",
+        )
