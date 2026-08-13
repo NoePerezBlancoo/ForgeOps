@@ -23,7 +23,14 @@ class LocalAgentRunner(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def run(self, task: Task, worktree: Path, prompt: Path, log_path: Path) -> RunnerResult:
+    def run(
+        self,
+        task: Task,
+        worktree: Path,
+        prompt: Path,
+        log_path: Path,
+        model: str,
+    ) -> RunnerResult:
         raise NotImplementedError
 
     @abstractmethod
@@ -102,7 +109,14 @@ class OpenHandsRunner(LocalAgentRunner):
         if probe.returncode != 0:
             raise AgentError("The isolated agent network cannot reach local Ollama")
 
-    def run(self, task: Task, worktree: Path, prompt: Path, log_path: Path) -> RunnerResult:
+    def run(
+        self,
+        task: Task,
+        worktree: Path,
+        prompt: Path,
+        log_path: Path,
+        model: str,
+    ) -> RunnerResult:
         self.ensure_runtime()
         container = self.container_name(task.id)
         network = "bridge" if task.allow_network else ISOLATED_NETWORK
@@ -148,7 +162,7 @@ class OpenHandsRunner(LocalAgentRunner):
             "-e",
             "HOME=/home/agent",
             "-e",
-            f"LLM_MODEL=openai/{self.config.primary_model}",
+            f"LLM_MODEL=openai/{model}",
             "-e",
             f"LLM_BASE_URL={base_url}",
             "-e",

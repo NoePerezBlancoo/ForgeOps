@@ -6,8 +6,8 @@ ollama:
   keep_alive: 10m
 
 selection:
-  primary: qwen3-coder:30b
-  fallback: devstral-small-2:24b
+  primary: devstral-small-2:24b
+  fallback: qwen3-coder:30b
 
 candidates:
   - name: qwen3-coder:30b
@@ -18,4 +18,3 @@ candidates:
     size_gb: 15
     native_context: 393216
     role: repository exploration and tool use
-

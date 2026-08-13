@@ -293,7 +293,7 @@ def write_benchmark_report(ai_root: Path, result: dict) -> None:
             for case in model["cases"]
         )
         sections.append(
-            f"## {model['model']}\n\nQuality: {model['quality_score']}  \nAverage speed: {model['average_tokens_per_second']} tok/s\n\n{cases}"
+            f"## {model['model']}\n\nQuality: {model['quality_score']}\n\nAverage speed: {model['average_tokens_per_second']} tok/s\n\n{cases}"
         )
     markdown = f"""# Local model benchmark
 

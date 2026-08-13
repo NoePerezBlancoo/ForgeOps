@@ -149,23 +149,19 @@ def benchmark_models(
             {"model": model, "keep_alive": 0},
             timeout=60,
         )
-    best_quality = max(item["quality_score"] for item in results)
-    quality_band = [
-        item for item in results if item["quality_score"] >= best_quality - 0.05
-    ]
     ranked = sorted(
-        quality_band,
-        key=lambda item: item["average_tokens_per_second"] or 0,
+        results,
+        key=lambda item: (
+            item["quality_score"],
+            item["average_tokens_per_second"] or 0,
+        ),
         reverse=True,
     )
-    ranked.extend(item for item in results if item not in ranked)
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "context_tokens": context_tokens,
         "primary": ranked[0]["model"],
         "fallback": ranked[1]["model"] if len(ranked) > 1 else None,
-        "selection_method": (
-            "Fastest model within 0.05 quality points of the best controlled score"
-        ),
+        "selection_method": "Highest controlled quality score; speed breaks ties",
         "models": results,
     }

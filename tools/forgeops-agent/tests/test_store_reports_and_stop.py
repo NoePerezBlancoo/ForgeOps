@@ -69,3 +69,19 @@ def test_stop_blocks_new_task(git_repo: Path, sample_task):
     with pytest.raises(PolicyError, match="STOP"):
         orchestrator.run_task(sample_task.id)
 
+
+def test_cleanup_accepts_terminal_failed_state(git_repo: Path, sample_task):
+    config = make_config(git_repo)
+    source = git_repo / "task.yaml"
+    write_task(source, sample_task)
+    orchestrator = Orchestrator(config)
+    orchestrator.store.delegate(source)
+    orchestrator.store.move(sample_task.id, "failed")
+    state = orchestrator.store.load_state(sample_task.id)
+    state.status = TaskStatus.FAILED
+    orchestrator.store.save_state(state)
+
+    cleaned = orchestrator.cleanup(sample_task.id)
+
+    assert cleaned.status is TaskStatus.FAILED
+    assert cleaned.last_action == "worktree cleaned; branch preserved"

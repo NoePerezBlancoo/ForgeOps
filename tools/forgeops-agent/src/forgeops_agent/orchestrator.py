@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from dataclasses import asdict
 from datetime import UTC, datetime
@@ -21,7 +22,7 @@ from forgeops_agent.git import (
     run_git,
 )
 from forgeops_agent.locks import FileLock
-from forgeops_agent.models import Task, TaskState, TaskStatus
+from forgeops_agent.models import TERMINAL_STATUSES, Task, TaskState, TaskStatus
 from forgeops_agent.policy import scan_secrets, validate_changed_paths, validate_task_policy
 from forgeops_agent.reports import write_review_package, write_task_report
 from forgeops_agent.runner import OpenHandsRunner
@@ -93,32 +94,49 @@ class Orchestrator:
             if state.base_commit and head_commit(worktree) != state.base_commit:
                 raise PolicyError("Agent branch contains an unvalidated commit")
             prompt = self._write_prompt(task, state, worktree)
-            state.last_action = "local agent running"
-            self.store.save_state(state)
-            self._write_status(state, resource_snapshot(self.config.repo_root))
-            result = self.runner.run(
-                task,
-                worktree,
-                prompt,
-                self.config.ai_root / "logs" / f"{task.id}.log",
-            )
-            if result.timed_out:
-                return self._finish(task, state, TaskStatus.TIMEOUT, "Task timeout reached")
-            if result.stopped:
-                return self._finish(task, state, TaskStatus.CANCELLED, "Kill switch activated")
-            if result.return_code != 0:
-                return self._finish(
+            models = [self.config.primary_model]
+            if (
+                self.config.fallback_model
+                and self.config.fallback_model != self.config.primary_model
+            ):
+                models.append(self.config.fallback_model)
+            paths: list[str] = []
+            for index, model in enumerate(models):
+                state.model = model
+                state.last_action = f"local agent running ({model})"
+                self.store.save_state(state)
+                self._write_status(state, resource_snapshot(self.config.repo_root))
+                log_model = re.sub(r"[^a-z0-9]+", "-", model.lower()).strip("-")
+                result = self.runner.run(
                     task,
-                    state,
-                    TaskStatus.FAILED,
-                    f"Agent exited with {result.return_code}: {result.summary[-1000:]}",
+                    worktree,
+                    prompt,
+                    self.config.ai_root / "logs" / f"{task.id}-{log_model}.log",
+                    model,
                 )
+                if result.timed_out:
+                    return self._finish(
+                        task, state, TaskStatus.TIMEOUT, "Task timeout reached"
+                    )
+                if result.stopped:
+                    return self._finish(
+                        task, state, TaskStatus.CANCELLED, "Kill switch activated"
+                    )
+                paths = changed_files(worktree, state.base_commit or "HEAD")
+                if result.return_code == 0 and paths:
+                    break
+                if paths or index == len(models) - 1:
+                    detail = (
+                        f"Agent exited with {result.return_code}: {result.summary[-1000:]}"
+                        if result.return_code != 0
+                        else "Agent produced no changes"
+                    )
+                    return self._finish(task, state, TaskStatus.FAILED, detail)
+                state.last_action = f"trying fallback after no changes from {model}"
+                self.store.save_state(state)
 
             state.last_action = "validating changed paths"
-            paths = changed_files(worktree, state.base_commit or "HEAD")
             state.changed_files = paths
-            if not paths:
-                return self._finish(task, state, TaskStatus.FAILED, "Agent produced no changes")
             path_policy = validate_changed_paths(
                 task, paths, self.config.protected_path_prefixes
             )
@@ -201,6 +219,14 @@ Required checks performed by the supervisor after you finish:
 
 Context files you may inspect:
 {self._bullets(task.context_files or task.allowed_paths)}
+
+Available OpenHands tools:
+- `terminal` for local shell commands inside `/workspace`
+- `file_editor` for reading and changing files
+- `task_tracker`, `think` and `finish`
+
+Do not invent tool names or delegate to subagents. Start by reading the listed context files,
+make the scoped change with `file_editor`, inspect it, then call `finish`.
 
 Codex feedback from a previous attempt:
 
@@ -307,12 +333,7 @@ Work only inside `/workspace`. Do not create commits. Finish after implementing 
     def cleanup(self, task_id: str) -> TaskState:
         task = self.store.load_task(task_id)
         state = self.store.load_state(task.id)
-        if state.status not in {
-            TaskStatus.COMPLETED,
-            TaskStatus.APPROVED,
-            TaskStatus.REJECTED,
-            TaskStatus.CANCELLED,
-        }:
+        if state.status not in TERMINAL_STATUSES:
             raise PolicyError(f"Cleanup refused for state {state.status.value}")
         if state.worktree and Path(state.worktree).exists():
             remove_worktree(self.config.repo_root, Path(state.worktree))

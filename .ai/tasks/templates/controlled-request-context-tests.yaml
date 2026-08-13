@@ -1,4 +1,4 @@
-id: AI-0004
+id: AI-0005
 title: Complete request context edge tests
 objective: Add focused tests for the missing X-Real-IP fallback and the absence of both forwarded and direct client addresses without changing production code.
 allowed_paths:
