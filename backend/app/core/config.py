@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "ForgeOps API"
     app_env: Literal["development", "testing", "staging", "production"] = "development"
-    app_version: str = "1.2.2"
+    app_version: str = "1.2.3"
     build_commit: str = Field(
         default="local",
         validation_alias=AliasChoices("RAILWAY_GIT_COMMIT_SHA", "BUILD_COMMIT"),
