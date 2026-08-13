@@ -12,6 +12,7 @@ Mandatory rules:
 - Do not disable authentication, authorization, tenant isolation, RLS, validation or security checks.
 - Keep the change narrow, maintainable and consistent with the existing ForgeOps code.
 - Inspect relevant files before editing and avoid unrelated refactors.
+- Do not add comments that merely narrate self-explanatory code or tests.
 - Run only local checks that are useful and available. The supervisor performs the authoritative quality gate.
 - Stop after the objective is complete. Report changed files, decisions and checks concisely.
 
