@@ -125,7 +125,9 @@ class AiderRunner(LocalAgentRunner):
             if task.allow_network
             else f"http://{GATEWAY_CONTAINER}:11434"
         )
-        editable_files = self._expand_task_files(worktree, task.allowed_paths, limit=50)
+        editable_files = self._expand_task_files(
+            worktree, task.allowed_paths, limit=50, allow_missing=True
+        )
         read_only_files = [
             path
             for path in self._expand_task_files(worktree, task.context_files, limit=100)
@@ -216,6 +218,7 @@ class AiderRunner(LocalAgentRunner):
         paths: tuple[str, ...],
         *,
         limit: int,
+        allow_missing: bool = False,
     ) -> list[str]:
         files: list[str] = []
         for relative in paths:
@@ -229,6 +232,8 @@ class AiderRunner(LocalAgentRunner):
                     for path in candidate.rglob("*")
                     if path.is_file() and ".git" not in path.parts
                 )
+            elif allow_missing and not relative.endswith("/"):
+                files.append(relative)
             if len(files) > limit:
                 raise AgentError(
                     f"Task context expands to more than {limit} files; narrow its paths"

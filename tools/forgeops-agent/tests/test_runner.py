@@ -25,3 +25,14 @@ def test_aider_rejects_overly_broad_task_context(tmp_path: Path):
 
     with pytest.raises(AgentError, match="narrow its paths"):
         AiderRunner._expand_task_files(tmp_path, ("frontend/",), limit=2)
+
+
+def test_aider_accepts_explicit_new_editable_file(tmp_path: Path):
+    files = AiderRunner._expand_task_files(
+        tmp_path,
+        ("frontend/components/new-form.tsx",),
+        limit=2,
+        allow_missing=True,
+    )
+
+    assert files == ["frontend/components/new-form.tsx"]
