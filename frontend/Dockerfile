@@ -25,6 +25,10 @@ RUN npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
+LABEL org.opencontainers.image.title="ForgeOps Frontend" \
+      org.opencontainers.image.description="ForgeOps industrial CMMS web application" \
+      org.opencontainers.image.version="1.2.2" \
+      org.opencontainers.image.source="https://github.com/NoePerezBlancoo/ForgeOps"
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
