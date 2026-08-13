@@ -31,6 +31,7 @@ from app.companies.trial_service import register_trial
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.rate_limit import rate_limit
+from app.core.request import get_client_ip
 from app.core.schemas import MessageResponse
 from app.users.models import User
 from app.users.schemas import UserRead
@@ -67,7 +68,7 @@ def create_trial(
 ) -> TokenResponse:
     user = register_trial(db, payload)
     access_token, refresh_token = issue_session(
-        db, user, request.client.host if request.client else None
+        db, user, get_client_ip(request)
     )
     _set_refresh_cookie(response, refresh_token)
     return TokenResponse(
@@ -90,7 +91,7 @@ def login(
 ) -> TokenResponse:
     user = authenticate(db, payload.email, payload.password)
     access_token, refresh_token = issue_session(
-        db, user, request.client.host if request.client else None
+        db, user, get_client_ip(request)
     )
     _set_refresh_cookie(response, refresh_token)
     return TokenResponse(
@@ -111,7 +112,7 @@ def password_reset_request(
     request: Request,
     db: Session = Depends(get_db),
 ) -> MessageResponse:
-    request_password_reset(db, payload.email, request.client.host if request.client else None)
+    request_password_reset(db, payload.email, get_client_ip(request))
     return MessageResponse(
         message="Si la cuenta existe, recibiras un enlace de recuperacion en unos minutos"
     )

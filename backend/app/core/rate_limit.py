@@ -8,6 +8,7 @@ from redis.exceptions import RedisError
 
 from app.core.config import settings
 from app.core.redis import get_redis
+from app.core.request import get_client_ip
 
 _fallback_lock = threading.Lock()
 _fallback_windows: dict[str, tuple[int, float]] = {}
@@ -43,7 +44,7 @@ def rate_limit(scope: str, setting_name: str) -> Callable:
         if not settings.rate_limit_enabled:
             return
         limit, window = _parse_rule(getattr(settings, setting_name))
-        identity = request.client.host if request.client else "unknown"
+        identity = get_client_ip(request) or "unknown"
         digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
         bucket = int(time.time()) // window
         key = f"forgeops:rate:{scope}:{digest}:{bucket}"

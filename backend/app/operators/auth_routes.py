@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.rate_limit import rate_limit
+from app.core.request import get_client_ip
 from app.core.schemas import MessageResponse
 from app.operators.auth_service import (
     authenticate_operator,
@@ -50,7 +51,7 @@ def login(
     response: Response,
     db: Session = Depends(get_db),
 ) -> OperatorTokenResponse:
-    ip_address = request.client.host if request.client else None
+    ip_address = get_client_ip(request)
     operator = authenticate_operator(
         db, payload.email, payload.password, payload.totp_code, ip_address
     )
@@ -77,7 +78,7 @@ def refresh(
     operator, access_token, new_refresh_token = rotate_operator_session(
         db,
         refresh_token,
-        request.client.host if request.client else None,
+        get_client_ip(request),
     )
     _set_operator_cookie(response, new_refresh_token)
     return OperatorTokenResponse(

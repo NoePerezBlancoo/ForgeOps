@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.enums import CompanyPlan
+from app.core.request import get_client_ip
 from app.operators.dependencies import get_current_operator
 from app.operators.models import PlatformOperator
 from app.operators.schemas import (
@@ -73,7 +74,7 @@ def company_update(
         operator,
         company_id,
         payload,
-        request.client.host if request.client else None,
+        get_client_ip(request),
     )
 
 
@@ -91,7 +92,7 @@ def company_extend_trial(
         company_id,
         payload.days,
         payload.reason,
-        request.client.host if request.client else None,
+        get_client_ip(request),
     )
 
 

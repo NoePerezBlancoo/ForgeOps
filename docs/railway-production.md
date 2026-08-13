@@ -53,6 +53,8 @@ El backend ejecuta `alembic upgrade head` como pre-deploy y luego comprueba que 
 
 El navegador necesita el dominio publico de API. Los servicios internos deben usar `*.railway.internal` o referencias de Railway cuando el proveedor lo permita.
 
+Railway entrega la IP original en `X-Real-IP`. Configurar `CLIENT_IP_SOURCE=x-real-ip` en backend para que rate limiting, sesiones y auditoria no utilicen la direccion interna cambiante del edge proxy. En despliegues sin un proxy que sobrescriba esa cabecera debe mantenerse `direct`.
+
 ## Variables
 
 Variables compartidas: `APP_ENV`, `APP_VERSION`, `SECRET_KEY`, URLs publicas, politica de cookies, SMTP, Sentry y flags globales.

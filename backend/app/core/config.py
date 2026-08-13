@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     docs_enabled: bool = True
     maintenance_mode: bool = False
     log_level: str = "INFO"
+    client_ip_source: Literal["direct", "x-real-ip"] = "direct"
 
     database_url: str = "postgresql+psycopg://forgeops:forgeops-local-only@localhost:5432/forgeops"
     migration_database_url: str | None = None
