@@ -10,6 +10,7 @@ from app.core.enums import Priority, UserRole, WorkOrderStatus
 from app.core.schemas import Page
 from app.users.models import User
 from app.work_orders.schemas import (
+    WorkOrderChecklistItemUpdate,
     WorkOrderComplete,
     WorkOrderCreate,
     WorkOrderDetailRead,
@@ -34,6 +35,7 @@ from app.work_orders.service import (
     remove_participant,
     reopen_work,
     start_work,
+    update_checklist_item,
     update_work_order,
     validate_work,
 )
@@ -168,6 +170,17 @@ def store_note(
     current_user: User = Depends(order_actors),
 ):
     return add_note(db, current_user, order_id, payload)
+
+
+@router.patch("/{order_id}/checklist/{item_id}", response_model=WorkOrderDetailRead)
+def update_checklist(
+    order_id: uuid.UUID,
+    item_id: uuid.UUID,
+    payload: WorkOrderChecklistItemUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(order_actors),
+):
+    return update_checklist_item(db, current_user, order_id, item_id, payload)
 
 
 @router.post("/{order_id}/complete", response_model=WorkOrderDetailRead)

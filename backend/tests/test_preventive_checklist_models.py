@@ -1,3 +1,5 @@
+import subprocess
+import sys
 import uuid
 from datetime import UTC, datetime
 
@@ -112,3 +114,18 @@ def test_checklist_contracts_validate_and_serialize_without_internal_state():
     assert WorkOrderChecklistItemUpdate(completed=True, version=1).completed is True
     with pytest.raises(ValidationError):
         WorkOrderChecklistItemUpdate(completed=True, version=0)
+
+
+def test_preventive_scheduler_initializes_all_orm_mappers():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import scripts.generate_due_preventive; "
+            "from sqlalchemy.orm import configure_mappers; configure_mappers()",
+        ],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr

@@ -25,7 +25,7 @@ from app.documents.models import TechnicalDocument
 from app.documents.storage import LocalDocumentStorage
 from app.incidents.models import Incident
 from app.inventory.models import InventoryItem, InventoryMovement
-from app.maintenance.models import PreventivePlan
+from app.maintenance.models import ChecklistTemplate, ChecklistTemplateItem, PreventivePlan
 from app.models import *  # noqa: F403
 from app.plants.models import Plant
 from app.users.models import User
@@ -596,7 +596,73 @@ def get_or_create_work_orders(db, company, plant, assets, users, incidents) -> N
         initialize_work_order_history(db, order, users["manager"])
 
 
-def get_or_create_preventive_plans(db, company, assets, users) -> None:
+def get_or_create_checklist_templates(db, company) -> list[ChecklistTemplate]:
+    definitions = [
+        (
+            "Revision mecanica estandar",
+            "Comprobacion repetible para equipos rotativos y transmisiones.",
+            [
+                ("Aplicar bloqueo y consignacion", "Verificar ausencia de energia.", True),
+                ("Comprobar lubricacion", "Registrar fugas, nivel y estado.", True),
+                ("Revisar holguras y fijaciones", None, True),
+                ("Registrar ruido y vibracion", "Anotar cualquier desviacion.", False),
+                ("Retirar bloqueo y probar", "Confirmar operacion estable.", True),
+            ],
+        ),
+        (
+            "Revision electrica segura",
+            "Inspeccion visual y funcional de cuadros, protecciones y cableado.",
+            [
+                ("Aplicar consignacion electrica", None, True),
+                ("Inspeccionar conexiones y bornes", None, True),
+                ("Comprobar protecciones", "Registrar valores medidos.", True),
+                ("Revisar ventilacion del cuadro", None, False),
+                ("Energizar y validar alarmas", None, True),
+            ],
+        ),
+        (
+            "Inspeccion de seguridad",
+            "Verificacion periodica de resguardos y sistemas de parada.",
+            [
+                ("Comprobar resguardos", None, True),
+                ("Probar paradas de emergencia", None, True),
+                ("Validar enclavamientos", None, True),
+                ("Registrar deficiencias", None, False),
+            ],
+        ),
+    ]
+    templates = []
+    for name, description, items in definitions:
+        template = db.scalar(
+            select(ChecklistTemplate).where(
+                ChecklistTemplate.company_id == company.id,
+                ChecklistTemplate.name == name,
+            )
+        )
+        if not template:
+            template = ChecklistTemplate(
+                company_id=company.id,
+                name=name,
+                description=description,
+                active=True,
+            )
+            template.items = [
+                ChecklistTemplateItem(
+                    company_id=company.id,
+                    title=title,
+                    instructions=instructions,
+                    position=position,
+                    required=required,
+                )
+                for position, (title, instructions, required) in enumerate(items, start=1)
+            ]
+            db.add(template)
+            db.flush()
+        templates.append(template)
+    return templates
+
+
+def get_or_create_preventive_plans(db, company, assets, users, templates) -> None:
     now = datetime.now(UTC)
     definitions = [
         ("Lubricacion y geometria mensual", 0, FrequencyType.MONTHS, 1, -2, 90, Priority.HIGH),
@@ -624,12 +690,15 @@ def get_or_create_preventive_plans(db, company, assets, users) -> None:
             )
         )
         if exists:
+            if not exists.checklist_template_id:
+                exists.checklist_template_id = templates[index % len(templates)].id
             continue
         db.add(
             PreventivePlan(
                 company_id=company.id,
                 asset_id=assets[asset_index].id,
                 assigned_to=users["tech1" if index % 2 == 0 else "tech2"].id,
+                checklist_template_id=templates[index % len(templates)].id,
                 name=name,
                 description=(
                     f"Intervencion preventiva estandarizada sobre {assets[asset_index].name}, "
@@ -766,7 +835,8 @@ def seed() -> None:
         assets = get_or_create_assets(db, company, plant)
         incidents = get_or_create_incidents(db, company, plant, assets, users)
         get_or_create_work_orders(db, company, plant, assets, users, incidents)
-        get_or_create_preventive_plans(db, company, assets, users)
+        templates = get_or_create_checklist_templates(db, company)
+        get_or_create_preventive_plans(db, company, assets, users, templates)
         get_or_create_inventory(db, company, users)
         get_or_create_documents(db, company, assets, users)
         db.commit()

@@ -99,3 +99,15 @@ Crear los environments GitHub `staging` y `production`:
 - Railway GitHub autodeploy debe esperar al check `Quality gate`, o desactivarse para usar solo los workflows del repositorio.
 
 El pipeline de produccion es manual y exige un tag `vX.Y.Z` ya validado en staging.
+
+## Generacion preventiva programada
+
+Crear un servicio Railway Cron desde la misma imagen del backend, sin dominio publico y con las variables de base de datos del entorno. Su comando es:
+
+```text
+python -m scripts.generate_due_preventive
+```
+
+Programarlo inicialmente una vez al dia, despues de la medianoche operativa. El proceso obtiene empresas activas en contexto interno, restablece el contexto tenant para cada una, bloquea cada plan y omite los que ya tienen una orden pendiente. Una repeticion segura no duplica OT.
+
+La cuenta usada por el cron debe compartir el rol runtime restringido; no recibe `MIGRATION_DATABASE_URL`. Supervisar su codigo de salida y logs desde Railway. La frecuencia puede aumentarse cuando un piloto necesite ventanas inferiores a un dia.

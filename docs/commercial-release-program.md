@@ -25,6 +25,7 @@ Fecha de auditoria: 2026-08-13.
 | Trial, onboarding y backoffice | `TESTED` | Flujos API y panel `/control` existentes |
 | Trazabilidad de intervenciones | `TESTED` | PostgreSQL real, ciclo multi-tecnico, permisos, historial inmutable y UI responsive |
 | Usuarios, invitaciones y notificaciones | `TESTED` | Invitacion de un solo uso, plazas, RLS, correo durable, avisos de dominio y UI responsive |
+| Mantenimiento preventivo | `TESTED` | Checklists historicos, generacion atomica, scheduler, RLS y ejecucion responsive |
 | PWA basica | `IMPLEMENTED` | Manifest, service worker, shell offline y cola local |
 | Railway staging V1.2.2 | `STAGING_VALIDATED` | Health, readiness, Redis, frontend y validador remoto comprobados |
 | Railway staging automatico | `EXTERNAL_BLOCKER` | Variable GitHub `RAILWAY_STAGING_ENABLED=false` |
@@ -42,9 +43,10 @@ Fecha de auditoria: 2026-08-13.
 | B | Production Foundation V1.2.3 | Version coherente, preflight, smoke tests, runbooks y gate de release | `TESTED` |
 | C | Intervention Traceability | Historial inmutable, varios tecnicos, sesiones, notas, estados y validacion | `TESTED` |
 | D | Users and Notifications | Invitaciones seguras, activacion, plazas, correo y avisos in-app | `TESTED` |
+| E | Preventive Maintenance | Planes recurrentes, checklists trazables y generacion automatizable de OT | `TESTED` |
 | M | Production Release | Cutover autorizado, observacion y validacion productiva | `EXTERNAL_BLOCKER` |
 
-La secuencia restante conserva este orden de dependencias: Users and Notifications, Preventive Maintenance, Inventory Integration, Technician PWA, Reporting, Product UX, Commercial Readiness, Assurance y Release Candidate. Cada fase recibira uno de los estados permitidos cuando exista implementacion o evidencia; no se asigna un estado anticipado.
+La secuencia restante conserva este orden de dependencias: Inventory Integration, Technician PWA, Reporting, Product UX, Commercial Readiness, Assurance y Release Candidate. Cada fase recibira uno de los estados permitidos cuando exista implementacion o evidencia; no se asigna un estado anticipado.
 
 ## Backlog activo
 
@@ -79,9 +81,27 @@ Estado: `TESTED`. Validado con suite completa, PostgreSQL/RLS, migracion sobre d
 
 Estado: `TESTED`. SMTP real permanece `EXTERNAL_BLOCKER`; el backend de desarrollo y la cola durable estan validados.
 
-### Phase E en adelante
+### Phase E - Preventive Maintenance
 
-Las tareas se concretan al cerrar la fase anterior. Ninguna feature se marca terminada sin backend, frontend, permisos, aislamiento, errores, responsive, pruebas y revision.
+- `AI-0401`: foundation amplia delegada; cancelada tras gates fallidos de Qwen y fallback Devstral sin resultado util.
+- `AI-0402`: contratos de datos delegados; aceptados tras revision, correccion de lint y pruebas por Codex.
+- `FO-0403`: migracion aditiva para plantillas, pasos y snapshots historicos por OT.
+- `FO-0404`: CRUD tenant-safe, asignacion a planes y copia atomica durante la generacion.
+- `FO-0405`: ejecucion tactil, autoria, fecha, version optimista y bloqueo de cierre por pasos obligatorios.
+- `FO-0406`: generador idempotente preparado para Railway Cron y datos demo sin duplicados.
+- `FO-0407`: pruebas funcionales, RLS, migracion reversible, build y QA responsive.
+
+Estado: `TESTED`. Validado con 61 pruebas backend, 4 pruebas PostgreSQL/RLS, 84 % de cobertura, auditorias de dependencias, build de produccion y recorrido visual real de plan a OT en 390 y 1280 px.
+
+### Phase F - Inventory Integration
+
+- `AI-0501`: contratos de consumo de repuestos por OT y movimientos inmutables.
+- `FO-0502`: stock transaccional, version optimista y prevencion de saldo negativo.
+- `FO-0503`: coste historico de consumo y agregado de materiales por OT.
+- `AI-0504`: experiencia tactil de consumo, devolucion y ajuste con permisos.
+- `FO-0505`: alertas de minimo, aislamiento RLS, pruebas y QA responsive.
+
+Estado: pendiente de implementacion.
 
 ## Gates de promocion
 

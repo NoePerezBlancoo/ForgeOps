@@ -24,12 +24,14 @@ from app.notifications.service import create_notification
 from app.users.models import User
 from app.work_orders.models import (
     WorkOrder,
+    WorkOrderChecklistItem,
     WorkOrderEvent,
     WorkOrderNote,
     WorkOrderParticipant,
     WorkSession,
 )
 from app.work_orders.schemas import (
+    WorkOrderChecklistItemUpdate,
     WorkOrderComplete,
     WorkOrderCreate,
     WorkOrderNoteCreate,
@@ -76,6 +78,9 @@ def _base_query(detail: bool = False):
                 selectinload(WorkOrder.sessions).joinedload(WorkSession.user),
                 selectinload(WorkOrder.notes).joinedload(WorkOrderNote.author),
                 selectinload(WorkOrder.events).joinedload(WorkOrderEvent.actor),
+                selectinload(WorkOrder.checklist_items).joinedload(
+                    WorkOrderChecklistItem.completer
+                ),
             ]
         )
     return select(WorkOrder).options(*options)
@@ -565,6 +570,59 @@ def add_note(
     return get_work_order_detail(db, current_user, order.id)
 
 
+def update_checklist_item(
+    db: Session,
+    current_user: User,
+    order_id: uuid.UUID,
+    item_id: uuid.UUID,
+    payload: WorkOrderChecklistItemUpdate,
+) -> WorkOrder:
+    order = _lock_order(db, current_user, order_id)
+    if current_user.role == UserRole.TECHNICIAN:
+        _active_participant(db, order, current_user)
+    if order.status not in {
+        WorkOrderStatus.ASSIGNED,
+        WorkOrderStatus.IN_PROGRESS,
+        WorkOrderStatus.WAITING,
+    }:
+        raise HTTPException(status_code=409, detail="La orden no admite cambios de checklist")
+    item = db.scalar(
+        select(WorkOrderChecklistItem)
+        .where(
+            WorkOrderChecklistItem.id == item_id,
+            WorkOrderChecklistItem.work_order_id == order.id,
+            WorkOrderChecklistItem.company_id == current_user.company_id,
+        )
+        .with_for_update()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Paso de checklist no encontrado")
+    if item.version != payload.version:
+        raise HTTPException(
+            status_code=409,
+            detail="El checklist ha cambiado. Recarga la orden antes de continuar",
+        )
+    now = datetime.now(UTC)
+    item.completed_at = now if payload.completed else None
+    item.completed_by = current_user.id if payload.completed else None
+    item.notes = payload.notes.strip() if payload.notes and payload.notes.strip() else None
+    action = "completado" if payload.completed else "reabierto"
+    _append_event(
+        db,
+        order,
+        current_user,
+        WorkOrderEventType.CHECKLIST_UPDATED,
+        f"{current_user.full_name} ha {action}: {item.title}",
+        {
+            "checklist_item_id": str(item.id),
+            "completed": payload.completed,
+            "notes": item.notes,
+        },
+    )
+    db.commit()
+    return get_work_order_detail(db, current_user, order.id)
+
+
 def complete_work(
     db: Session,
     current_user: User,
@@ -583,6 +641,18 @@ def complete_work(
         WorkOrderStatus.WAITING,
     }:
         raise HTTPException(status_code=409, detail="La orden no se puede finalizar")
+    incomplete_required = db.scalar(
+        select(func.count(WorkOrderChecklistItem.id)).where(
+            WorkOrderChecklistItem.work_order_id == order.id,
+            WorkOrderChecklistItem.required.is_(True),
+            WorkOrderChecklistItem.completed_at.is_(None),
+        )
+    ) or 0
+    if incomplete_required:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Quedan {incomplete_required} pasos obligatorios del checklist",
+        )
     work_performed = payload.work_performed.strip()
     failure_cause = (payload.failure_cause or "").strip()
     resolution = (payload.resolution or "").strip()
