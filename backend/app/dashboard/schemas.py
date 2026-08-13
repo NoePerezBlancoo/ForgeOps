@@ -16,6 +16,22 @@ class ChartItem(BaseModel):
     value: float
 
 
+class AssetImpact(BaseModel):
+    asset_id: UUID
+    asset_code: str
+    asset_name: str
+    incidents: int
+    downtime_hours: float
+
+
+class TechnicianLoad(BaseModel):
+    user_id: UUID
+    full_name: str
+    active_work_orders: int
+    in_progress_work_orders: int
+    active_sessions: int
+
+
 class RecentIncident(BaseModel):
     id: UUID
     title: str
@@ -49,6 +65,8 @@ class PilotReadiness(BaseModel):
 
 
 class DashboardRead(BaseModel):
+    period_days: int
+    generated_at: datetime
     readiness: PilotReadiness
     active_assets: int
     stopped_assets: int
@@ -61,8 +79,15 @@ class DashboardRead(BaseModel):
     upcoming_preventive_count: int
     low_stock_items: int
     downtime_hours: float
+    mttr_hours: float | None
+    resolved_incidents: int
+    overdue_work_orders: int
+    overdue_preventive_count: int
     asset_statuses: list[ChartItem]
     work_order_statuses: list[ChartItem]
     incidents_by_priority: list[ChartItem]
+    incident_trend: list[ChartItem]
+    top_assets: list[AssetImpact]
+    technician_workload: list[TechnicianLoad]
     recent_incidents: list[RecentIncident]
     upcoming_work_orders: list[UpcomingWorkOrder]

@@ -47,6 +47,7 @@ Fecha de auditoria: 2026-08-13.
 | E | Preventive Maintenance | Planes recurrentes, checklists trazables y generacion automatizable de OT | `TESTED` |
 | F | Inventory Integration | Consumos y devoluciones por OT, stock concurrente, costes y alertas | `TESTED` |
 | G | Technician PWA | Lectura offline, incidencias y notas idempotentes, sincronizacion y UX movil | `TESTED` |
+| H | Operational Reporting | Dashboard temporal, MTTR, vencimientos, carga, impacto y exportacion | `TESTED` |
 | M | Production Release | Cutover autorizado, observacion y validacion productiva | `EXTERNAL_BLOCKER` |
 
 La secuencia restante conserva este orden de dependencias: Technician PWA, Reporting, Product UX, Commercial Readiness, Assurance y Release Candidate. Cada fase recibira uno de los estados permitidos cuando exista implementacion o evidencia; no se asigna un estado anticipado.
@@ -116,6 +117,17 @@ Estado: `TESTED`. Validado con 66 pruebas backend, 5 pruebas PostgreSQL/RLS, 84,
 - `FO-0606`: service worker sin cache de API/control, UX tactil y acciones concurrentes online-only.
 
 Estado: `TESTED`. Validado con suite backend completa, pruebas unitarias del motor, migracion PostgreSQL, lint, typecheck, build de produccion y QA responsive/offline.
+
+### Phase H - Operational Reporting
+
+- `AI-0701`: interfaz delegada; Qwen rompio el contrato global de tipos y Devstral salio del scope permitido, por lo que ambos intentos fueron rechazados y Codex completo la integracion.
+- `FO-0702`: periodos cerrados de 7, 30, 90 y 365 dias con filtro de planta.
+- `FO-0703`: MTTR, parada, vencimientos y tendencia de incidencias.
+- `FO-0704`: activos de mayor impacto y carga activa por tecnico.
+- `FO-0705`: exportacion CSV que reutiliza el mismo servicio tenant-safe.
+- `FO-0706`: pruebas API, aislamiento, PostgreSQL real, build y QA responsive.
+
+Estado: `TESTED`. Validado con 71 pruebas backend, 5 pruebas PostgreSQL/RLS, 84,54 % de cobertura, 9 pruebas frontend, migraciones limpias, build de produccion, API/CSV reales y QA visual a 390, 768 y 1280 px.
 
 ## Gates de promocion
 

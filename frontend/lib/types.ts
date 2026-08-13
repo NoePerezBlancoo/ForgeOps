@@ -497,6 +497,8 @@ export interface WorkOrderDetail extends WorkOrder {
 }
 
 export interface DashboardData {
+  period_days: number;
+  generated_at: string;
   readiness: {
     percent: number;
     completed: number;
@@ -514,9 +516,28 @@ export interface DashboardData {
   upcoming_preventive_count: number;
   low_stock_items: number;
   downtime_hours: number;
+  mttr_hours: number | null;
+  resolved_incidents: number;
+  overdue_work_orders: number;
+  overdue_preventive_count: number;
   asset_statuses: Array<{ label: string; value: number }>;
   work_order_statuses: Array<{ label: string; value: number }>;
   incidents_by_priority: Array<{ label: string; value: number }>;
+  incident_trend: Array<{ label: string; value: number }>;
+  top_assets: Array<{
+    asset_id: string;
+    asset_code: string;
+    asset_name: string;
+    incidents: number;
+    downtime_hours: number;
+  }>;
+  technician_workload: Array<{
+    user_id: string;
+    full_name: string;
+    active_work_orders: number;
+    in_progress_work_orders: number;
+    active_sessions: number;
+  }>;
   recent_incidents: Array<{
     id: string;
     title: string;

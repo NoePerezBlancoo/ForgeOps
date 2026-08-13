@@ -92,6 +92,14 @@ export default function AssetsPage() {
       .catch((requestError) => setError(requestError instanceof ApiError ? requestError.message : "No se pudieron cargar las plantas"));
   }, [request]);
 
+  useEffect(() => {
+    const requestedSearch = new URLSearchParams(window.location.search).get("search");
+    if (!requestedSearch) return;
+    setSearch(requestedSearch);
+    setPage(1);
+    window.history.replaceState({}, "", "/assets");
+  }, []);
+
   const assets = pageData?.items ?? [];
 
   function openCreate() {
