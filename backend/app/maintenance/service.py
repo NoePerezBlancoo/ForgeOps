@@ -13,6 +13,7 @@ from app.maintenance.models import PreventivePlan
 from app.maintenance.schemas import PreventivePlanCreate, PreventivePlanUpdate
 from app.users.models import User
 from app.work_orders.models import WorkOrder
+from app.work_orders.service import initialize_work_order_history
 
 
 def _base_query():
@@ -116,7 +117,9 @@ def generate_work_order(db: Session, current_user: User, plan_id: uuid.UUID) -> 
     pending = db.scalar(
         select(WorkOrder).where(
             WorkOrder.preventive_plan_id == plan.id,
-            WorkOrder.status.notin_([WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED]),
+            WorkOrder.status.notin_(
+                [WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED, WorkOrderStatus.CANCELLED]
+            ),
         )
     )
     if pending:
@@ -145,6 +148,7 @@ def generate_work_order(db: Session, current_user: User, plan_id: uuid.UUID) -> 
     plan.last_generated_at = now
     plan.next_execution = _advance(plan.next_execution, plan.frequency_type, plan.frequency_value)
     db.add(order)
+    initialize_work_order_history(db, order, current_user)
     db.commit()
     return order
 

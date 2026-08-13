@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="ForgeOps Backend" \
       org.opencontainers.image.description="ForgeOps industrial CMMS API and worker runtime" \
-      org.opencontainers.image.version="1.2.2" \
+      org.opencontainers.image.version="1.2.3" \
       org.opencontainers.image.source="https://github.com/NoePerezBlancoo/ForgeOps"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

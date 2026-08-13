@@ -30,6 +30,7 @@ from app.models import *  # noqa: F403
 from app.plants.models import Plant
 from app.users.models import User
 from app.work_orders.models import WorkOrder
+from app.work_orders.service import initialize_work_order_history
 
 
 def get_or_create_company(db) -> Company:
@@ -561,31 +562,38 @@ def get_or_create_work_orders(db, company, plant, assets, users, incidents) -> N
             continue
         completed = state == WorkOrderStatus.COMPLETED
         in_progress = state == WorkOrderStatus.IN_PROGRESS
-        db.add(
-            WorkOrder(
-                company_id=company.id,
-                plant_id=plant.id,
-                asset_id=assets[asset_index].id,
-                incident_id=incidents[incident_title].id if incident_title else None,
-                assigned_to=users["tech1" if index % 2 == 0 else "tech2"].id,
-                created_by=users["manager"].id,
-                number=number,
-                title=title,
-                description=f"Intervencion planificada sobre {assets[asset_index].name}.",
-                type=order_type,
-                priority=priority,
-                status=state,
-                scheduled_date=now + timedelta(days=day_offset),
-                started_at=now + timedelta(days=day_offset, hours=1)
-                if in_progress or completed
-                else None,
-                completed_at=now + timedelta(days=day_offset, hours=3) if completed else None,
-                estimated_duration=duration,
-                real_duration=duration - 15 if completed else None,
-                observations="Trabajo ejecutado y validado por produccion." if completed else None,
-                created_at=now - timedelta(days=14 - index),
-            )
+        order = WorkOrder(
+            company_id=company.id,
+            plant_id=plant.id,
+            asset_id=assets[asset_index].id,
+            incident_id=incidents[incident_title].id if incident_title else None,
+            assigned_to=users["tech1" if index % 2 == 0 else "tech2"].id,
+            created_by=users["manager"].id,
+            number=number,
+            title=title,
+            description=f"Intervencion planificada sobre {assets[asset_index].name}.",
+            type=order_type,
+            priority=priority,
+            status=state,
+            scheduled_date=now + timedelta(days=day_offset),
+            started_at=now + timedelta(days=day_offset, hours=1)
+            if in_progress or completed
+            else None,
+            completed_at=now + timedelta(days=day_offset, hours=3) if completed else None,
+            estimated_duration=duration,
+            real_duration=duration - 15 if completed else None,
+            observations="Trabajo ejecutado y validado por produccion." if completed else None,
+            work_performed="Intervencion ejecutada y equipo verificado." if completed else None,
+            failure_cause="Desgaste del componente durante la operacion." if completed else None,
+            resolution="Componente ajustado o sustituido y prueba funcional correcta."
+            if completed
+            else None,
+            validated_by=users["manager"].id if completed else None,
+            validated_at=now + timedelta(days=day_offset, hours=4) if completed else None,
+            created_at=now - timedelta(days=14 - index),
         )
+        db.add(order)
+        initialize_work_order_history(db, order, users["manager"])
 
 
 def get_or_create_preventive_plans(db, company, assets, users) -> None:
@@ -726,7 +734,13 @@ def get_or_create_documents(db, company, assets, users) -> None:
         if exists:
             continue
         encoded = content.encode("utf-8")
-        key = storage.store(company.id, filename, encoded)
+        stored = storage.store(
+            company.id,
+            assets[asset_index].id,
+            filename,
+            encoded,
+            "text/plain",
+        )
         db.add(
             TechnicalDocument(
                 company_id=company.id,
@@ -734,10 +748,10 @@ def get_or_create_documents(db, company, assets, users) -> None:
                 uploaded_by=users["manager"].id,
                 name=name,
                 type=document_type,
-                storage_key=key,
-                original_name=filename,
-                mime_type="text/plain; charset=utf-8",
-                file_size=len(encoded),
+                storage_key=stored.key,
+                original_name=stored.original_name,
+                mime_type=stored.mime_type,
+                file_size=stored.size,
                 description="Documento tecnico controlado para uso del equipo de mantenimiento.",
             )
         )

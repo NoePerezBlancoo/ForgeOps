@@ -8,7 +8,7 @@ WORKDIR /app
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 ARG NEXT_PUBLIC_SALES_EMAIL=contacto@forgeops.local
 ARG NEXT_PUBLIC_DEMO_CREDENTIALS=true
-ARG NEXT_PUBLIC_APP_VERSION=1.2.2
+ARG NEXT_PUBLIC_APP_VERSION=1.2.3
 ARG NEXT_PUBLIC_BUILD_COMMIT=local
 ARG RAILWAY_GIT_COMMIT_SHA
 ARG NEXT_PUBLIC_ENVIRONMENT=development
@@ -27,7 +27,7 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 LABEL org.opencontainers.image.title="ForgeOps Frontend" \
       org.opencontainers.image.description="ForgeOps industrial CMMS web application" \
-      org.opencontainers.image.version="1.2.2" \
+      org.opencontainers.image.version="1.2.3" \
       org.opencontainers.image.source="https://github.com/NoePerezBlancoo/ForgeOps"
 ENV NODE_ENV=production
 ENV PORT=3000

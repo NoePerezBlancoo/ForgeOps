@@ -2,7 +2,7 @@
 
 ForgeOps es una plataforma SaaS B2B multiempresa para mantenimiento industrial. Centraliza plantas, activos, incidencias, ordenes, preventivos, repuestos, documentacion tecnica e inteligencia documental con trazabilidad por usuario.
 
-La version **1.2.1 Production Foundation** convierte el piloto funcional en una base desplegable y operable: servicios stateless, aislamiento PostgreSQL RLS, storage S3, Redis/worker, planes y limites, PWA, backoffice propietario, CI/CD y runbooks de recuperacion.
+La version **1.2.3 Production Deployment Foundation** convierte el piloto funcional en una base desplegable, verificable y operable: servicios stateless, aislamiento PostgreSQL RLS, storage S3, Redis/worker, planes y limites, PWA, backoffice propietario, CI/CD y validacion estricta de releases.
 
 ## Producto
 
@@ -129,7 +129,7 @@ Implementado y probado localmente: nucleo operativo, backoffice MFA, planes/limi
 
 Preparado pero dependiente de configuracion externa: Railway staging/production, dominios publicos, PostgreSQL HA/PgBouncer gestionados, Bucket, SMTP, Sentry y PITR.
 
-Fuera de V1.2.1: facturacion automatica, exportacion/destruccion completa de tenant, antivirus gestionado, OPC UA/MQTT/ERP productivos y SSO Enterprise.
+Fuera de V1.2.3: facturacion automatica, exportacion/destruccion completa de tenant, antivirus gestionado, OPC UA/MQTT/ERP productivos y SSO Enterprise.
 
 ## Licencia
 

@@ -21,6 +21,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: staging
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
@@ -31,6 +32,14 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Resolve release identity
+        shell: bash
+        run: |
+          echo "EXPECTED_VERSION=$(node -p "require('./frontend/package.json').version")" >> "$GITHUB_ENV"
+          echo "EXPECTED_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
       - run: npm install --global @railway/cli@5.37.7
       - name: Deploy backend
         run: railway up --service backend --environment staging --ci
@@ -40,8 +49,7 @@ jobs:
         run: railway up --service frontend --environment staging --ci
       - name: Validate staging
         env:
-          STAGING_API_URL: ${{ vars.STAGING_API_URL }}
-          STAGING_APP_URL: ${{ vars.STAGING_APP_URL }}
-        run: |
-          curl --fail --silent --show-error "$STAGING_API_URL/ready"
-          curl --fail --silent --show-error "$STAGING_APP_URL/login" > /dev/null
+          RELEASE_API_URL: ${{ vars.STAGING_API_URL }}
+          RELEASE_APP_URL: ${{ vars.STAGING_APP_URL }}
+          EXPECTED_ENVIRONMENT: staging
+        run: python backend/scripts/validate_release.py

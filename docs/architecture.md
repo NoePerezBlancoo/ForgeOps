@@ -1,6 +1,6 @@
 # Arquitectura de ForgeOps
 
-> Estado: Production Foundation V1.2.1. Las decisiones completas estan en `docs/adr/`.
+> Estado: Production Deployment Foundation V1.2.3. Las decisiones completas estan en `docs/adr/`.
 
 ForgeOps es un monorepo con frontend Next.js, API FastAPI, worker RQ, PostgreSQL/pgvector, Redis y almacenamiento S3 compatible. Frontend, backend y worker son contenedores independientes y stateless. PostgreSQL, Redis y S3 son los unicos almacenes persistentes.
 

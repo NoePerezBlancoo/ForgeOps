@@ -9,6 +9,7 @@ const tones: Record<string, string> = {
   ASSIGNED: "badge-info",
   IN_PROGRESS: "badge-warning",
   WAITING: "badge-neutral",
+  PENDING_VALIDATION: "badge-warning",
   STOPPED: "badge-danger",
   OUT_OF_SERVICE: "badge-neutral",
   MAINTENANCE: "badge-warning",

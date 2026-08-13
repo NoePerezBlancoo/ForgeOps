@@ -256,6 +256,23 @@ textarea.field {
   background: #fafcfb;
 }
 
+.work-orders-table {
+  min-width: 560px;
+  table-layout: fixed;
+}
+
+.work-orders-table th,
+.work-orders-table td {
+  padding-right: 12px;
+  padding-left: 12px;
+}
+
+.work-orders-table th:nth-child(1) { width: 19%; }
+.work-orders-table th:nth-child(2) { width: 38%; }
+.work-orders-table th:nth-child(3) { width: 17%; }
+.work-orders-table th:nth-child(4) { width: 18%; }
+.work-orders-table th:nth-child(5) { width: 8%; }
+
 .document-table {
   min-width: 850px;
   table-layout: fixed;

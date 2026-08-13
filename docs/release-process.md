@@ -7,7 +7,7 @@
 3. Revisar migraciones, cambios de variables y compatibilidad hacia atras.
 4. Fusionar a `main`; el workflow despliega staging si dispone de credenciales.
 5. Ejecutar smoke test de staging: health, ready, login, tenant A/B, operador, trial, storage, worker y PWA.
-6. Actualizar version y notas; crear tag firmado o protegido `v1.2.1`.
+6. Actualizar version y notas; crear tag firmado o protegido `v1.2.3`.
 7. Ejecutar `Release production`, aprobar el environment y validar healthchecks.
 8. Observar errores, latencia y jobs durante 30 minutos.
 
