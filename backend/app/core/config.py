@@ -44,10 +44,12 @@ class Settings(BaseSettings):
     rate_limit_login: str = "10/60"
     rate_limit_trial_signup: str = "5/3600"
     rate_limit_password_reset: str = "5/3600"
+    rate_limit_invitation: str = "10/3600"
     rate_limit_upload: str = "30/3600"
     job_queue_name: str = "forgeops"
     job_max_attempts: int = Field(default=3, ge=1, le=10)
     job_dispatch_enabled: bool = True
+    invitation_expiry_hours: int = Field(default=72, ge=1, le=336)
 
     secret_key: str = "development-key-change-before-deployment-2026"
     access_token_minutes: int = 15

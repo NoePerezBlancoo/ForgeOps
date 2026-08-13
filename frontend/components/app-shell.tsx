@@ -27,6 +27,7 @@ import { useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { AccessBlocked, ModuleUnavailable, TrialBanner } from "@/components/commercial-state";
 import { HelpDrawer } from "@/components/help-drawer";
+import { NotificationCenter } from "@/components/notification-center";
 import { useWorkspace } from "@/components/workspace-provider";
 import { initials, labelFor } from "@/lib/format";
 import { moduleForPath } from "@/lib/modules";
@@ -70,6 +71,7 @@ const pageNames: Record<string, string> = {
   "/modules": "Modulos de trabajo",
   "/getting-started": "Primeros pasos",
   "/settings": "Seguridad y auditoria",
+  "/notifications": "Notificaciones",
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -246,6 +248,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button className="icon-button hidden sm:inline-grid" onClick={() => setHelpOpen(true)} aria-label="Abrir ayuda" title="Ayuda y tutorial">
               <CircleHelp size={18} />
             </button>
+            <NotificationCenter />
             <div className="h-8 w-px bg-[var(--line)]" />
             <Link href="/settings" className="flex items-center gap-2.5" title="Perfil y seguridad">
               <div className="grid size-9 place-items-center rounded-md bg-[var(--ink)] text-xs font-bold text-white">

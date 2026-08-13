@@ -93,6 +93,7 @@ export default function WorkOrdersPage() {
   const [completeForm, setCompleteForm] = useState(emptyComplete);
   const [reviewNote, setReviewNote] = useState("");
   const detailRef = useRef<HTMLElement>(null);
+  const deepLinkHandled = useRef(false);
   const deferredSearch = useDeferredValue(search);
 
   const isManager = Boolean(user && ["SUPER_ADMIN", "ADMIN", "MAINTENANCE_MANAGER"].includes(user.role));
@@ -107,6 +108,15 @@ export default function WorkOrdersPage() {
     try {
       const loaded = await request<Paginated<WorkOrder>>(scopedPath(`/work-orders/page?${params}`));
       setPageData(loaded);
+      const requestedOrder = !deepLinkHandled.current
+        ? new URLSearchParams(window.location.search).get("order")
+        : null;
+      if (requestedOrder) {
+        deepLinkHandled.current = true;
+        setSelectedId(requestedOrder);
+        window.history.replaceState({}, "", "/work-orders");
+        return;
+      }
       setSelectedId((current) =>
         current && loaded.items.some((item) => item.id === current)
           ? current

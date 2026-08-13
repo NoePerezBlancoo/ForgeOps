@@ -18,6 +18,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 WRITE_WHITELIST = {
     "/api/v1/auth/password",
     "/api/v1/auth/sessions/revoke-others",
+    "/api/v1/notifications/read-all",
 }
 
 
@@ -51,6 +52,11 @@ def get_current_user(
     if (
         request.method not in {"GET", "HEAD", "OPTIONS"}
         and request.url.path not in WRITE_WHITELIST
+        and not (
+            request.method == "PATCH"
+            and request.url.path.startswith("/api/v1/notifications/")
+            and request.url.path.endswith("/read")
+        )
         and not user.company.write_enabled
     ):
         raise HTTPException(

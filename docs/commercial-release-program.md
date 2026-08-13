@@ -24,6 +24,7 @@ Fecha de auditoria: 2026-08-13.
 | Storage privado S3 | `TESTED` | Validacion de firma, claves por tenant y URLs firmadas |
 | Trial, onboarding y backoffice | `TESTED` | Flujos API y panel `/control` existentes |
 | Trazabilidad de intervenciones | `TESTED` | PostgreSQL real, ciclo multi-tecnico, permisos, historial inmutable y UI responsive |
+| Usuarios, invitaciones y notificaciones | `TESTED` | Invitacion de un solo uso, plazas, RLS, correo durable, avisos de dominio y UI responsive |
 | PWA basica | `IMPLEMENTED` | Manifest, service worker, shell offline y cola local |
 | Railway staging V1.2.2 | `STAGING_VALIDATED` | Health, readiness, Redis, frontend y validador remoto comprobados |
 | Railway staging automatico | `EXTERNAL_BLOCKER` | Variable GitHub `RAILWAY_STAGING_ENABLED=false` |
@@ -40,6 +41,7 @@ Fecha de auditoria: 2026-08-13.
 | A | Local AI Orchestrator | Delegacion aislada, gates, metricas y flujo de revision | `TESTED` |
 | B | Production Foundation V1.2.3 | Version coherente, preflight, smoke tests, runbooks y gate de release | `TESTED` |
 | C | Intervention Traceability | Historial inmutable, varios tecnicos, sesiones, notas, estados y validacion | `TESTED` |
+| D | Users and Notifications | Invitaciones seguras, activacion, plazas, correo y avisos in-app | `TESTED` |
 | M | Production Release | Cutover autorizado, observacion y validacion productiva | `EXTERNAL_BLOCKER` |
 
 La secuencia restante conserva este orden de dependencias: Users and Notifications, Preventive Maintenance, Inventory Integration, Technician PWA, Reporting, Product UX, Commercial Readiness, Assurance y Release Candidate. Cada fase recibira uno de los estados permitidos cuando exista implementacion o evidencia; no se asigna un estado anticipado.
@@ -66,7 +68,18 @@ La secuencia restante conserva este orden de dependencias: Users and Notificatio
 
 Estado: `TESTED`. Validado con suite completa, PostgreSQL/RLS, migracion sobre datos existentes, build de produccion y revision visual a 390 y 1440 px.
 
-### Phase D en adelante
+### Phase D - Users and Notifications
+
+- `AI-0301`: foundation de persistencia delegada; `FAILED` tras dos pasadas Qwen y dos fallbacks Devstral, corregida bajo control de Codex.
+- `FO-0302`: invitaciones tenant-safe con token de un solo uso, expiracion, revocacion, reenvio y reserva de plazas.
+- `FO-0303`: email de invitacion mediante job durable con payload cifrado y proveedor abstracto.
+- `FO-0304`: notificaciones in-app deduplicadas para OT asignada e incidencia critica.
+- `FO-0305`: centro de notificaciones, enlaces profundos y gestion de equipo sin contrasenas temporales.
+- `FO-0306`: pruebas funcionales, RLS PostgreSQL, migracion reversible y QA responsive.
+
+Estado: `TESTED`. SMTP real permanece `EXTERNAL_BLOCKER`; el backend de desarrollo y la cola durable estan validados.
+
+### Phase E en adelante
 
 Las tareas se concretan al cerrar la fase anterior. Ninguna feature se marca terminada sin backend, frontend, permisos, aislamiento, errores, responsive, pruebas y revision.
 

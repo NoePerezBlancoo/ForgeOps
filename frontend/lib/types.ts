@@ -121,6 +121,55 @@ export interface UserOption {
   active: boolean;
 }
 
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
+
+export interface UserInvitation {
+  id: string;
+  company_id: string;
+  email: string;
+  full_name: string;
+  job_title: string | null;
+  phone: string | null;
+  role: UserRole;
+  inviter_id: string | null;
+  accepted_user_id: string | null;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+  status: InvitationStatus;
+}
+
+export interface UserInvitationList {
+  items: UserInvitation[];
+  pending: number;
+}
+
+export type NotificationType =
+  | "WORK_ORDER_ASSIGNED"
+  | "CRITICAL_INCIDENT"
+  | "PREVENTIVE_DUE"
+  | "PREVENTIVE_OVERDUE"
+  | "LOW_STOCK"
+  | "TRIAL_EXPIRING";
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  href: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationList {
+  items: AppNotification[];
+  total: number;
+  unread: number;
+}
+
 export interface PlatformOperator {
   id: string;
   full_name: string;

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.assets.models import Asset
 from app.audit.service import add_audit_event
 from app.core.enums import (
+    NotificationType,
     Priority,
     UserRole,
     WorkOrderEventType,
@@ -19,6 +20,7 @@ from app.core.enums import (
 )
 from app.core.pagination import paginate
 from app.incidents.models import Incident
+from app.notifications.service import create_notification
 from app.users.models import User
 from app.work_orders.models import (
     WorkOrder,
@@ -272,7 +274,7 @@ def initialize_work_order_history(db: Session, order: WorkOrder, creator: User) 
             WorkOrderParticipantRole.LEAD,
             creator.id,
         )
-        _append_event(
+        assignment_event = _append_event(
             db,
             order,
             creator,
@@ -280,6 +282,7 @@ def initialize_work_order_history(db: Session, order: WorkOrder, creator: User) 
             f"{participant.user.full_name} asignado como tecnico principal",
             {"user_id": str(participant.user_id)},
         )
+        _notify_assignment(db, order, participant.user_id, assignment_event.id)
     return order
 
 
@@ -334,7 +337,7 @@ def update_work_order(
             summary = "Orden sin tecnico principal"
         if order.status in {WorkOrderStatus.OPEN, WorkOrderStatus.ASSIGNED}:
             order.status = WorkOrderStatus.ASSIGNED if new_assignee else WorkOrderStatus.OPEN
-        _append_event(
+        assignment_event = _append_event(
             db,
             order,
             current_user,
@@ -345,6 +348,8 @@ def update_work_order(
                 "user_id": str(new_assignee) if new_assignee else None,
             },
         )
+        if new_assignee:
+            _notify_assignment(db, order, new_assignee, assignment_event.id)
     else:
         _append_event(
             db,
@@ -388,7 +393,7 @@ def add_participant(
         order.assigned_to = user.id
         if order.status == WorkOrderStatus.OPEN:
             order.status = WorkOrderStatus.ASSIGNED
-    _append_event(
+    assignment_event = _append_event(
         db,
         order,
         current_user,
@@ -396,6 +401,7 @@ def add_participant(
         f"{user.full_name} incorporado a la intervencion",
         {"user_id": str(user.id), "role": participant.role.value},
     )
+    _notify_assignment(db, order, user.id, assignment_event.id)
     db.commit()
     return get_work_order_detail(db, current_user, order.id)
 
@@ -908,3 +914,21 @@ def _append_event(
     db.add(timeline_event)
     db.flush()
     return timeline_event
+
+
+def _notify_assignment(
+    db: Session,
+    order: WorkOrder,
+    recipient_id: uuid.UUID,
+    event_id: uuid.UUID,
+) -> None:
+    create_notification(
+        db,
+        company_id=order.company_id,
+        recipient_id=recipient_id,
+        notification_type=NotificationType.WORK_ORDER_ASSIGNED,
+        title=f"Trabajo asignado: {order.number}",
+        body=order.title,
+        href=f"/work-orders?order={order.id}",
+        dedupe_key=f"work-order-assignment:{event_id}",
+    )

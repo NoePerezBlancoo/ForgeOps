@@ -27,6 +27,8 @@ const tones: Record<string, string> = {
   SUSPENDED: "badge-danger",
   EXPIRED: "badge-danger",
   INACTIVE: "badge-neutral",
+  ACCEPTED: "badge-success",
+  REVOKED: "badge-neutral",
   PROFESSIONAL: "badge-success",
   STARTER: "badge-info",
   PRO: "badge-success",

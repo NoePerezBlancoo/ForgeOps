@@ -9,7 +9,9 @@ from app.dashboard.routes import router as dashboard_router
 from app.documents.routes import router as documents_router
 from app.incidents.routes import router as incidents_router
 from app.inventory.routes import router as inventory_router
+from app.invitations.routes import router as invitations_router
 from app.maintenance.routes import router as maintenance_router
+from app.notifications.routes import router as notifications_router
 from app.onboarding.routes import router as onboarding_router
 from app.operators.auth_routes import router as operator_auth_router
 from app.operators.routes import router as operator_router
@@ -22,6 +24,8 @@ api_router.include_router(auth_router)
 api_router.include_router(operator_auth_router)
 api_router.include_router(operator_router)
 api_router.include_router(users_router)
+api_router.include_router(invitations_router)
+api_router.include_router(notifications_router)
 api_router.include_router(companies_router)
 api_router.include_router(plants_router)
 api_router.include_router(assets_router)
